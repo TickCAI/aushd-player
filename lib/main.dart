@@ -61,7 +61,7 @@ Future<void> _initWindow() async {
   await windowManager.ensureInitialized();
   await windowManager.waitUntilReadyToShow(
     const WindowOptions(
-      title: 'Zerk Play',
+      title: 'AusHD Player',
       size: Size(1600, 900),
       minimumSize: Size(960, 540),
       center: true,
@@ -145,7 +145,7 @@ class _ZerkAppState extends State<ZerkApp> {
     final services = AppServicesScope.of(context);
     final signedIn = services.isSignedIn;
     return MaterialApp(
-      title: 'Zerk Play',
+      title: 'AusHD Player',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
       locale: Locale(services.settings.resolvedUiLanguage),

@@ -8,7 +8,7 @@ import '../../core/storage/local_store.dart';
 final class JanusService {
   JanusService({
     required this._store,
-    this._clientName = 'Zerk Play',
+    this._clientName = 'AusHD Player',
     required this._deviceName,
     required this._appVersion,
   });

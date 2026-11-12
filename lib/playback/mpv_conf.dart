@@ -24,7 +24,7 @@ abstract final class MpvConf {
     await Process.start(Platform.isLinux ? 'xdg-open' : 'explorer.exe', [dir]);
   }
 
-  static const _template = '''# Zerk Play: your own mpv options (https://mpv.io/manual/stable/)
+  static const _template = '''# AusHD Player：在此填写你自己的 mpv 选项 (https://mpv.io/manual/stable/)
 #
 # Loaded after the app's settings, so anything here wins over them.
 # Applied from the next playback. One option per line, without the leading --.

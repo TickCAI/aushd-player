@@ -7,7 +7,7 @@ const int kUnlimitedBitrate = 1000000000;
 Map<String, Object?> buildDesktopDeviceProfile({int maxBitrate = 0}) {
   final bitrate = maxBitrate > 0 ? maxBitrate : kUnlimitedBitrate;
   return {
-    'Name': 'Zerk Play (libmpv)',
+    'Name': 'AusHD Player (libmpv)',
     'MaxStreamingBitrate': bitrate,
     'MaxStaticBitrate': bitrate,
     'MusicStreamingTranscodingBitrate': 320000,
@@ -106,7 +106,7 @@ Map<String, Object?> buildAndroidDeviceProfile(Map<String, Object?>? caps,
   }
 
   return {
-    'Name': 'Zerk Play (Android TV)',
+    'Name': 'AusHD Player (Android TV)',
     'MaxStreamingBitrate': bitrate,
     'MaxStaticBitrate': bitrate,
     'MusicStreamingTranscodingBitrate': 320000,

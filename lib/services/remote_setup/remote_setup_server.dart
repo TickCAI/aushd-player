@@ -95,7 +95,7 @@ final class RemoteSetupServer {
         try {
           input = jsonDecode(body) as Map<String, dynamic>;
         } catch (_) {
-          return await _send(res, HttpStatus.badRequest, 'Bad JSON.');
+          return await _send(res, HttpStatus.badRequest, '请求格式错误。');
         }
         _emit(RemoteSetupEvent.applying);
         final result = await _apply(input);
@@ -181,7 +181,7 @@ final class RemoteSetupServer {
       final problem = await _services.checkSeerr();
       result['seerr'] = {
         'ok': problem == null,
-        'message': problem == null ? 'Connected to ${_services.seerr!.baseUrl}.' : l10n.seerrProblem(problem),
+        'message': problem == null ? '已连接 ${_services.seerr!.baseUrl}。' : l10n.seerrProblem(problem),
       };
     }
     if (useTmdb || (tmdbKey?.isNotEmpty ?? false)) {
@@ -209,7 +209,7 @@ final class RemoteSetupServer {
       try {
         final kind = ServerKind.parse(field('serverKind'));
         await _services.signIn(server: server, kind: kind, username: username, password: (input['password'] as String?) ?? '');
-        result['emby'] = {'ok': true, 'message': 'Signed in as $username.'};
+        result['emby'] = {'ok': true, 'message': '已登录：$username。'};
       } catch (e) {
         if (!wasOnboarded) await _services.updateSettings(_services.settings.copyWith(onboarded: false));
         result['emby'] = {'ok': false, 'message': _describeSignInError(e)};
@@ -222,8 +222,8 @@ final class RemoteSetupServer {
 
   static String _describeSignInError(Object e) {
     final s = '$e';
-    if (s.contains('401')) return 'Wrong username or password.';
-    if (s.contains('SocketException') || s.contains('Connection')) return 'The TV could not reach the server. Check the address.';
+    if (s.contains('401')) return '用户名或密码错误。';
+    if (s.contains('SocketException') || s.contains('Connection')) return '电视无法连接服务器，请检查地址。';
     return s;
   }
 

@@ -18,7 +18,7 @@ final class PlaybackWebhook {
     if (url == null || !url.hasScheme) return;
     final body = jsonEncode({
       'event': event,
-      'app': 'Zerk Play',
+      'app': 'AusHD Player',
       if (item != null) ...{
         'id': item.id,
         'type': item.type,

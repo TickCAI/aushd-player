@@ -81,7 +81,13 @@ List<String?> standardMeta(L10n l10n, EmbyItem item) => [
       endsAt(l10n, item.runtime, position: item.resumePosition),
     ];
 
-String formatDate(L10n l10n, DateTime d) => '${d.day} ${l10n.monthsShort.split(' ')[d.month - 1]} ${d.year}';
+String formatDate(L10n l10n, DateTime d) {
+  // Chinese readers expect 年/月/日 order; other locales keep "day Month year".
+  if (l10n.localeName.startsWith('zh')) {
+    return '${d.year}年${d.month}月${d.day}日';
+  }
+  return '${d.day} ${l10n.monthsShort.split(' ')[d.month - 1]} ${d.year}';
+}
 
 class CastRow extends StatelessWidget {
   const CastRow({super.key, required this.people, this.left = pageLeft});

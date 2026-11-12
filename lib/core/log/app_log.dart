@@ -46,7 +46,7 @@ abstract final class AppLog {
     } catch (e) {
       _console?.call('[log] could not open the log file: $e');
     }
-    write('[app] Zerk Play $appVersion (${kReleaseMode ? 'release' : kProfileMode ? 'profile' : 'debug'})');
+    write('[app] AusHD Player $appVersion (${kReleaseMode ? 'release' : kProfileMode ? 'profile' : 'debug'})');
     if (_sink != null) write('[log] writing to ${_sink!.file}');
     unawaited(LogSink.systemInfo().then((lines) {
       for (final line in lines) {
