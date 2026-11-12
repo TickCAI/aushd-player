@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
-Name=Zerk Play
+Name=AusHD Player
 GenericName=Media player
-Comment=Emby and Jellyfin client with Seerr requests
+Comment=Chinese-localized Emby and Jellyfin client with Seerr requests
 Exec=zerk-play %U
 Icon=cloud.zerk.play
 Terminal=false

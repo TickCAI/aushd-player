@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../core/host.dart';
 
 
-const uiLanguages = {'en': 'English', 'ro': 'Română', 'fr': 'Français', 'de': 'Deutsch', 'es': 'Español', 'pl': 'Polski'};
+const uiLanguages = {'zh': '简体中文', 'en': 'English', 'ro': 'Română', 'fr': 'Français', 'de': 'Deutsch', 'es': 'Español', 'pl': 'Polski'};
 
 const metadataLanguages = {
   '': 'From the server (Emby)',
@@ -22,6 +22,8 @@ const metadataLanguages = {
   'hu-HU': 'Magyar',
   'ja-JP': '日本語',
   'ko-KR': '한국어',
+  'zh-CN': '简体中文',
+  'zh-TW': '繁體中文',
 };
 
 enum TrailerMode {
@@ -140,7 +142,7 @@ final class AppSettings {
   }
 
   String get uiMetadataLanguage =>
-      const {'ro': 'ro-RO', 'fr': 'fr-FR', 'de': 'de-DE', 'es': 'es-ES', 'pl': 'pl-PL'}[resolvedUiLanguage] ?? 'en-US';
+      const {'zh': 'zh-CN', 'ro': 'ro-RO', 'fr': 'fr-FR', 'de': 'de-DE', 'es': 'es-ES', 'pl': 'pl-PL'}[resolvedUiLanguage] ?? 'en-US';
 
   String get tmdbLanguage => metadataLanguage.isEmpty ? 'en-US' : metadataLanguage;
 

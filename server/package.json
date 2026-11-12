@@ -1,0 +1,16 @@
+{
+  "name": "aushd-distribution",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Self-hosted distribution service for AusHD Player (release metadata, artifacts, hub link protocol)",
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "publish": "node scripts/publish.js",
+    "test": "node test/smoke.js"
+  },
+  "license": "GPL-3.0-or-later"
+}

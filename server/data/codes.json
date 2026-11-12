@@ -1,0 +1,31 @@
+{
+  "AUSHD-DEMO": {
+    "active": false,
+    "expiresAt": "2027-12-31T00:00:00Z",
+    "server": {
+      "name": "My Emby",
+      "url": "https://emby.example.com",
+      "kind": "emby"
+    },
+    "features": {
+      "requests": true,
+      "together": false,
+      "profiles": true,
+      "redownload": true
+    },
+    "refreshHours": 6,
+    "metadataLanguage": "zh-CN",
+    "tmdbApiKey": "",
+    "mdblistApiKey": "",
+    "seerr": {
+      "enabled": false,
+      "url": ""
+    },
+    "liveTv": {
+      "xtreamUrl": "",
+      "xtreamAccounts": [],
+      "playlistUrl": "",
+      "playlistGuideUrl": ""
+    }
+  }
+}

@@ -1,0 +1,193 @@
+name: Build AusHD Player
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Version tag to build (e.g. v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
+  DIST_URL: ${{ secrets.DIST_URL || 'https://dist.example.com' }}
+  ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows
+          - os: ubuntu-latest
+            platform: linux
+          - os: ubuntu-latest
+            platform: androidtv
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Show toolchain
+        shell: bash
+        run: flutter --version
+
+      - name: Resolve dependencies
+        shell: bash
+        run: flutter pub get
+
+      - name: Validate localizations
+        shell: bash
+        run: flutter gen-l10n
+
+      - name: Inject distribution config
+        shell: bash
+        run: |
+          echo "AUSHD_DIST_URL=$DIST_URL" >> "$GITHUB_ENV"
+          echo "AUSHD_HUB_URL=$DIST_URL" >> "$GITHUB_ENV"
+
+      # ---------------- Windows ----------------
+      - name: Install Inno Setup
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: choco install innosetup -y --no-progress
+
+      - name: Build Windows
+        if: matrix.platform == 'windows'
+        shell: bash
+        run: |
+          V="${TAG#v}"
+          flutter build windows --release \
+            --build-name="$V" --build-number=1 \
+            --dart-define=AUSHD_DIST_URL="$AUSHD_DIST_URL" \
+            --dart-define=AUSHD_HUB_URL="$AUSHD_HUB_URL" \
+            --dart-define=AUSHD_CHANNEL=stable
+
+      - name: Package Windows installer
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { throw "ISCC.exe not found" }
+          & $iscc "installer\zerk_play.iss"
+
+      - name: Collect Windows artifact
+        if: matrix.platform == 'windows'
+        shell: bash
+        run: |
+          V="${TAG#v}"
+          mkdir -p dist
+          cp build/installer/*.exe "dist/AusHD-Player-${V}-Windows-setup.exe"
+          ls -lh dist
+
+      # ---------------- Linux ----------------
+      - name: Install Linux build dependencies
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config \
+            libgtk-3-dev liblzma-dev libmpv-dev libsecret-1-dev libjsoncpp-dev
+
+      - name: Build and package Linux
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          V="${TAG#v}"
+          flutter build linux --release \
+            --build-name="$V" --build-number=1 \
+            --dart-define=AUSHD_DIST_URL="$AUSHD_DIST_URL" \
+            --dart-define=AUSHD_HUB_URL="$AUSHD_HUB_URL" \
+            --dart-define=AUSHD_CHANNEL=stable
+          SKIP_BUILD=1 VERSION="$V" bash linux/packaging/make-tarball.sh
+          mkdir -p dist
+          cp build/linux/package/*.tar.gz "dist/AusHD-Player-${V}-Linux-x64.tar.gz"
+          ls -lh dist
+
+      # ---------------- Android TV ----------------
+      - uses: actions/setup-java@v4
+        if: matrix.platform == 'androidtv'
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Build Android TV APK
+        if: matrix.platform == 'androidtv'
+        shell: bash
+        run: |
+          V="${TAG#v}"
+          flutter build apk --release \
+            --build-name="$V" --build-number=1 \
+            --dart-define=PLAY_STORE=false \
+            --dart-define=AUSHD_DIST_URL="$AUSHD_DIST_URL" \
+            --dart-define=AUSHD_HUB_URL="$AUSHD_HUB_URL" \
+            --dart-define=AUSHD_CHANNEL=stable
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-release.apk "dist/AusHD-Player-${V}-AndroidTV.apk"
+          ls -lh dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-${{ matrix.platform }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: AusHD Player ${{ env.TAG }}
+          generate_release_notes: true
+          files: artifacts/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Register artifacts with distribution service
+        if: env.DIST_URL != 'https://dist.example.com' && env.ADMIN_TOKEN != ''
+        shell: bash
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          V="${TAG#v}"
+          shopt -s nullglob
+          for f in artifacts/*; do
+            case "$f" in
+              *.exe)    platform=windows ;;
+              *.apk)    platform=androidtv ;;
+              *.tar.gz) platform=linux ;;
+              *)        echo "skip $f"; continue ;;
+            esac
+            echo "registering $f for $platform"
+            node server/scripts/publish.js \
+              --tag "$TAG" \
+              --platform "$platform" \
+              --file "$f" \
+              --name "AusHD Player $V" \
+              --version "$V" \
+              --notes "Built by GitHub Actions for $TAG"
+          done

@@ -1,0 +1,48 @@
+AusHD Player — third-party notices
+==================================
+
+Upstream
+--------
+Zerk Play 2.0, https://github.com/florinp93/Zerk-Play-2.0
+Copyright (C) 2026 florinp93. Licensed under the GNU General Public License
+version 3.0. The complete license text is preserved in LICENSE at the
+repository root. AusHD Player is a modified version of that work; see README.md
+for the GPLv3 section 5(a) modification notice.
+
+The name "Zerk Play" and its original artwork are not licensed to this fork.
+"AusHD" and the derived brand assets in assets/brand/ are separate marks.
+
+Bundled / linked components
+---------------------------
+The exact license of each bundled component is governed by the license file in
+its own directory. This list is an index, not a re-licensing:
+
+  Flutter SDK / Dart SDK / engine         BSD-3-Clause (Flutter distribution)
+  mpv, libmpv and bundled Lua scripts    LGPL-2.1-or-later / GPL-2.0-or-later
+                                         (see the mpv distribution used at build time)
+  assets/mpv/fonts/MaterialIcons-Player.otf
+                                         Apache License 2.0 (Google Material Icons)
+  android/app/src/main/cpp/aften/        see android/app/src/main/cpp/aften/COPYING
+  FFmpeg (Android TV audio decoder)      LGPL/GPL depending on the build configuration
+  AndroidX Media3                       Apache License 2.0
+  Kotlin / Gradle plugins                Apache License 2.0
+  pub.dev packages (http, intl, crypto, shared_preferences, win32,
+  window_manager, qr, youtube_explode_dart, path_provider, uuid, ffi,
+  web_socket_channel, flutter_lints)     see each package's LICENSE file
+
+Fonts
+-----
+No Chinese UI font is bundled yet. When one is added (planned: Noto Sans SC,
+SIL Open Font License 1.1), its OFL license text MUST be added to this notice
+and to assets/fonts/.
+
+External services
+-----------------
+TMDB, MDBList, Seerr/Jellyseerr, Emby, Jellyfin, Xtream Codes IPTV providers
+and YouTube are independent services. Users supply their own accounts and API
+keys. Their terms of service are separate from this repository's code license.
+
+Warranty
+--------
+THIS PROGRAM IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, to the extent
+permitted by applicable law (GPLv3 sections 15 and 16).

@@ -1,114 +1,79 @@
 <p align="center">
-  <img src="banner.png" alt="Zerk Play" width="840">
+  <img src="assets/brand/aushd-logo.png" alt="AusHD Player" width="420">
 </p>
 
 <p align="center">
-  A free, open-source Emby and Jellyfin client for <b>Windows</b>, <b>Linux</b> and <b>Android TV / Google TV</b>,<br>
-  built around discovery and Seerr requests.
+  中文优先的 Emby / Jellyfin 客户端，支持 <b>Windows</b>、<b>Linux</b> 与 <b>Android TV / Google TV</b>。
 </p>
 
-<p align="center">
-  <a href="https://ko-fi.com/florinp93"><img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Support on Ko-fi"></a>
-  &nbsp;
-  <a href="https://discord.gg/rBRpMbAVz9"><img src="https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
-</p>
+# AusHD Player
 
-<p align="center">
-  <a href="https://github.com/florinp93/Zerk-Play-2.0/releases"><b>Download the latest release</b></a> for Windows, Linux and Android TV
-</p>
+> **修改声明（GNU GPL v3.0 第 5(a) 条）**
+> 本仓库是上游 [`florinp93/Zerk-Play-2.0`](https://github.com/florinp93/Zerk-Play-2.0) 的**修改版本**，
+> 由 AusHD 于 **2026-11-12** 基于上游提交 `a20b48f`（2 beta 9）fork 并修改。
+> 修改内容包括：品牌标识与图标、版本号与更新分发机制、界面语言与语言配置、分发服务端。
+> 原作者版权归 florinp93 所有，原 `LICENSE`（GNU GPL v3.0 全文）完整保留。
+> 本修改版整体仍以 **GNU GPL v3.0** 授权，**不附加任何额外限制**。
 
-![Home](screenshots/01-home-hero.png)
+## 与上游及第三方的关系
 
-Zerk Play 2 is a full rewrite and still in beta, so expect rough edges and please report anything that breaks. Installed copies update themselves when a new release is out.
+- "Zerk Play" 名称、Logo 及相关商标属于上游作者；本项目的 "AusHD" 名称与图标为独立品牌资源。本项目与上游作者无关联，也**不隶属于** Emby、Jellyfin、Seerr 或 TMDB。
+- 软件按 GPLv3 第 15、16 条"按原样"提供，**无任何担保**。
+- 打包的第三方组件及其许可见 [`NOTICE`](NOTICE)。TMDB / Seerr / Xtream IPTV 等服务需用户自备账号与 API 密钥，其服务条款独立于本仓库的代码许可。
 
-When you open it, it should help you find something to watch, not leave you scrolling a library grid. If what you want isn't on the server yet, you can request it from the same screen.
+## 当前进度
 
-## Discovery first
+| 项目 | 状态 |
+| --- | --- |
+| 品牌矢量资源与 Windows / Android TV / Linux 图标 | 已完成 |
+| 更新器解耦：改查自建分发服务 + SHA256 校验 | 已完成 |
+| 设置页加入 `简体中文` / `zh-CN` / `zh-TW` | 已完成 |
+| 自建分发后端（版本 API、安装包托管、hub 兑换码、日志接收） | 已完成，18 项自测通过 |
+| GitHub Actions 三平台构建与发布 | 已完成配置 |
+| 中文文案 `lib/l10n/app_zh.arb` | 697 条骨架已建立，核心文案已译，其余分批补齐 |
+| 完整品牌重命名（内部包名 / 二进制名） | 未做，见下方说明 |
 
-Home is built from your watch history, not just "Latest added":
+**有意保留的内部标识**：`pubspec.yaml` 的 `name: zerk_play`、Android `applicationId = cloud.zerk.play`、`BINARY_NAME zerk_play`、Kotlin 包目录 `cloud/zerk/play`。改这些会牵动签名、类名、桌面文件、安装包脚本与大量 import，风险高；显示名、图标与文案已全部改为 AusHD。等 CI 三平台构建稳定后再单独做一轮重命名。
 
-- **Because you watched…** suggestions based on what you actually finished
-- **What are you in the mood for?** theme rows like *Coming of age*, *Against all odds*, *Whodunits* and *Heists & cons*, each showing how many titles you already have
-- **Picked for you**, plus rows built from your taste (*Because you like Action · Comedy*)
-- **Top 10 trending**, with a big-number row like the streaming services have
+## 构建（不在本地进行）
 
-![Because you watched](screenshots/02-because-you-watched-request.png)
+本项目**不要求本地安装 Flutter/Dart**。推送 `v*` tag 或手动触发工作流即可：
 
-![What are you in the mood for?](screenshots/03-mood-rows.png)
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
 
-![Top 10 trending](screenshots/04-top10-trending.png)
+`.github/workflows/build.yml` 会并行构建 Windows（Inno Setup 安装包）、Linux（tar.gz）、Android TV（APK），创建 GitHub Release，并在配置好 Secrets 后把产物登记到分发服务。
 
-Every title has **tags** (from TMDB keywords: *Heist*, *Hitman*, *Based on a true story*…). Open a tag to see everything that matches, starting with what's already in your library. Each details page also has **More like this**, and trailers play in the background while you read.
+需要在仓库 Settings → Secrets 中配置：
 
-![Title details with trailer](screenshots/08-title-details-trailer.png)
+| Secret | 说明 |
+| --- | --- |
+| `DIST_URL` | 分发服务对外 HTTPS 地址，注入客户端 `AUSHD_DIST_URL` / `AUSHD_HUB_URL` |
+| `ADMIN_TOKEN` | 分发服务管理 token，用于登记版本 |
 
-![Tags and More like this](screenshots/09-tags-more-like-this.png)
+未配置时仍会构建并发布 GitHub Release，只是跳过登记步骤，客户端会使用占位地址。
 
-![Tag page](screenshots/10-tag-page.png)
+## 分发后端
 
-There's also a **Discover** tab (trending, popular, coming soon), a **Calendar** of upcoming releases, and **Collections** built from TMDB, even if your server doesn't group them.
+见 [`server/README.md`](server/README.md)。零依赖 Node.js 服务：
 
-![Discover](screenshots/13-discover.png)
+```bash
+cd server
+npm test                 # 端到端自测
+ADMIN_TOKEN=xxx PUBLIC_BASE_URL=https://dist.example.com npm start
+```
 
-## Requests built in (Seerr)
+客户端 `lib/services/updater/updater.dart` 读取 `GET /api/releases/latest`，下载后按 `sha256` 流式校验，再静默安装；不再访问上游作者的 GitHub releases。
 
-Connect Seerr and titles you don't have show up right next to the ones you do:
+## 本地化
 
-- A **Request** badge on anything not in your library, in every row: home, Discover, search, More like this
-- One **Request** page: pick the seasons, watch the trailer, done
-- **Search** shows your library first, then a *Not in your library* row you can request from
-- **Requested** and **Awaiting release** badges, so you can see what's on the way
+- `l10n.yaml` 以 `app_en.arb` 为模板生成 `L10n`；新增 `app_zh.arb` 即自动加入支持语言。
+- `lib/app/app_settings.dart` 中 `uiLanguages`、`metadataLanguages`、UI→TMDB 语言映射为硬编码常量，已同步加入中文。
+- `lib/l10n/tag_names_zh.dart`（TMDB 关键词中文映射）待第二批接入，接入点是 `lib/ui/pages/title_extras.dart`。
+- 中文字体、日期格式、10-foot UI 回归与简体/繁体拆分见项目目录下的《本地化方案.md》。
 
-![Not in your library](screenshots/05-not-in-library-request.png)
+## 合规提醒
 
-![Request page](screenshots/11-request-page.png)
-
-![Search with requests](screenshots/16-search-request-not-in-library.png)
-
-![Coming soon](screenshots/14-coming-soon-requested.png)
-
-## Playback
-
-- **Windows:** mpv (libmpv, gpu-next on D3D11) with real **HDR** output. It can switch Windows HDR on for HDR videos and back off afterwards. Audio passthrough to your receiver (TrueHD, DTS-HD MA, EAC3…).
-- **Linux:** the same mpv player through libmpv, with VA-API (Intel / AMD) or NVDEC (NVIDIA) hardware decoding, on Wayland and X11.
-- **Android TV:** a native Media3 player with an FFmpeg audio decoder, plus passthrough settings for your TV / soundbar / receiver.
-- **Versions:** if a movie has several files (1080p, 2160p Dolby Vision…), you can pick one and the app remembers your choice.
-- **Skip intro**, manually or automatically.
-- **Subtitles:** a *Smart* mode (your language, or forced subtitles for foreign dialogue), size and style options, and a delay setting.
-- TMDB metadata **in your language** (titles, descriptions, logos, artwork) without touching your server's libraries.
-
-![Settings](screenshots/19-settings-content-trailers.png)
-
-## Live TV
-
-Add your own Xtream Codes IPTV account to get a proper **TV guide**: channel groups, an EPG timeline and what's on now. Live TV works next to your movie library in the same app.
-
-![Live TV guide](screenshots/17-live-tv-guide.png)
-
-## Made for the couch
-
-The whole UI is driven by **D-pad / remote / keyboard** first. It works on Windows and Linux too: plug in a gamepad or use the arrow keys, and the mouse cursor hides itself until you move it again. The mouse still works everywhere, with hover and wheel scrolling.
-
-Setup on a TV is painless: **scan a QR code with your phone** and fill in the server, TMDB key and Seerr details there instead of typing with a remote.
-
-![Library](screenshots/20-library-movies.png)
-
-## Getting started
-
-1. Open the [latest release](https://github.com/florinp93/Zerk-Play-2.0/releases) (the newest is at the top) and download `ZerkPlay-Public-Windows-setup.exe` for Windows, `ZerkPlay-Public-Android.apk` for Android TV, or `ZerkPlay-Public-Linux-x64.tar.gz` for Linux (install mpv, extract it and run `zerk-play/zerk_play`; on Arch, [`linux/packaging/PKGBUILD`](linux/packaging/PKGBUILD) builds a package).
-2. On first start, choose **Emby or Jellyfin** and sign in.
-3. *(Optional)* Add a free **TMDB API key** for metadata in your language, tags and collections.
-4. *(Optional)* Add your **Seerr** address and API key for requests.
-
-> The Seerr address has to be reachable from the device running Zerk Play. Don't use `localhost` unless Seerr runs on that same machine.
-
-## Good to know
-
-- **Jellyfin support is brand new.** It was developed against Emby and has only been tested lightly with Jellyfin. Please report anything that breaks.
-- The APK isn't on the Play Store: install it with Downloader, Send Files to TV, or adb.
-- Tested on Windows 11, Arch Linux and a Chromecast with Google TV 4K. Other distros and Android TV boxes should work; reports are welcome.
-- You bring your own servers and API keys. Nothing is hardcoded in the public build.
-- Zerk Play is not affiliated with Emby, Jellyfin, Seerr or TMDB.
-- The player's icons on Linux (`assets/mpv/fonts/MaterialIcons-Player.otf`) are a subset of Google's [Material Icons](https://github.com/google/material-design-icons), used under the Apache License 2.0.
-
-Feedback, bug reports and feature ideas are very welcome: open an issue or join the Discord.
+若对外分发安装包，除保留本文件与 `LICENSE` 外，还须提供**完整对应源码**（含 `server/`、`.github/` 与打包脚本）、保留界面中的许可与无担保声明、标明修改与日期，并随附 `NOTICE`。仅自用不分发时无此义务。

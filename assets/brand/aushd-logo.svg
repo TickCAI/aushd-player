@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 260" width="640" height="260">
+  <defs>
+    <linearGradient id="aushdGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#DDEB86"/>
+      <stop offset="0.36" stop-color="#9BDFAC"/>
+      <stop offset="0.62" stop-color="#5CD5C4"/>
+      <stop offset="1" stop-color="#0CBDE6"/>
+    </linearGradient>
+    <linearGradient id="aushdArrow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.98"/>
+      <stop offset="1" stop-color="#E9FBFF" stop-opacity="0.82"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(14 26) scale(0.945)">
+    <path d="M30 44 Q30 18 52 22 L176 94 Q202 110 176 126 L52 198 Q30 202 30 176 Z" fill="url(#aushdGrad)"/>
+    <path d="M66 76 Q62 76 62 82 L62 138 Q62 144 66 144 L100 144 L152 114 Q160 110 152 106 L100 76 Z" fill="url(#aushdArrow)"/>
+    <path d="M100 76 L152 106 Q160 110 152 114 L112 134 Z" fill="#FFFFFF" opacity="0.42"/>
+    <path d="M62 110 L112 134 L100 144 L66 144 Q62 144 62 138 Z" fill="#FFFFFF" opacity="0.22"/>
+  </g>
+  <text x="246" y="176" font-family="Arial, Helvetica, sans-serif" font-size="126" font-weight="700" letter-spacing="-5" fill="#212228">AusHD</text>
+</svg>

@@ -1,0 +1,6 @@
+artifacts/*
+data/logs/
+data/link_usage.json
+.env
+node_modules/
+*.log

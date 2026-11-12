@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' show AppExitType;
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -13,55 +14,86 @@ import '../../app/release.dart';
 import '../../core/host.dart';
 
 final class AppUpdate {
-  const AppUpdate({required this.tag, required this.name, required this.download, required this.size});
+  const AppUpdate({
+    required this.tag,
+    required this.name,
+    required this.download,
+    required this.size,
+    this.sha256 = '',
+    this.notes = '',
+  });
 
   final String tag;
   final String name;
   final Uri download;
   final int size;
+  final String sha256;
+  final String notes;
 }
 
 final class UpdateNotAllowed implements Exception {
   const UpdateNotAllowed();
 }
 
+/// Reads release metadata from the self-hosted AusHD distribution service
+/// instead of the upstream author's GitHub releases.
 abstract final class Updater {
   static const _channel = MethodChannel('zerk/updater');
 
-  static String get _assetName => Host.isAndroid ? 'ZerkPlay-Public-Android.apk' : 'ZerkPlay-Public-Windows-setup.exe';
-
   static const playStore = bool.fromEnvironment('PLAY_STORE');
-
   static bool get supported => !playStore && (Host.isWindows || Host.isAndroid);
 
+  static String get _platform =>
+      Host.isWindows ? 'windows' : Host.isAndroid ? 'androidtv' : 'linux';
+
+  static String _endpoint(String path) {
+    final base = Uri.parse(Release.distributionApi);
+    final prefix = base.path.endsWith('/')
+        ? base.path.substring(0, base.path.length - 1)
+        : base.path;
+    return base.replace(path: '$prefix$path').toString();
+  }
+
   static Future<AppUpdate?> check() async {
-    final res = await http.get(
-      Uri.https('api.github.com', '/repos/${Release.repository}/releases', {'per_page': '10'}),
-      headers: {'Accept': 'application/vnd.github+json'},
-    ).timeout(const Duration(seconds: 15));
-    if (res.statusCode != 200) throw HttpException('GitHub answered ${res.statusCode}');
-    final releases = (jsonDecode(res.body) as List).cast<Map<String, dynamic>>().where((r) => r['draft'] != true).toList()
-      ..sort((a, b) => '${b['published_at']}'.compareTo('${a['published_at']}'));
-    final latest = releases.firstOrNull;
-    if (latest == null || latest['tag_name'] == Release.tag) return null;
-    final asset = (latest['assets'] as List).cast<Map<String, dynamic>>().where((a) => a['name'] == _assetName).firstOrNull;
-    if (asset == null) return null;
-    final tag = latest['tag_name'] as String;
-    final name = (latest['name'] as String?)?.trim() ?? '';
-    debugPrint('[update] ${Release.tag} -> $tag');
+    final url = Uri.parse(_endpoint('/api/releases/latest')).replace(
+      queryParameters: {
+        'platform': _platform,
+        'channel': Release.channel,
+        'current': Release.tag,
+      },
+    );
+    final res = await http
+        .get(url, headers: {'accept': 'application/json'})
+        .timeout(const Duration(seconds: 15));
+    if (res.statusCode == 204 || res.statusCode == 404) return null;
+    if (res.statusCode != 200) {
+      throw HttpException('Distribution server answered ${res.statusCode}');
+    }
+    final json = jsonDecode(utf8.decode(res.bodyBytes));
+    if (json is! Map || json['tag'] is! String || json['download'] is! String) return null;
+    if (json['available'] == false || json['tag'] == Release.tag) return null;
+    final tag = '${json['tag']}';
+    final name = (json['name'] as String?)?.trim() ?? '';
     return AppUpdate(
       tag: tag,
       name: name.isEmpty ? tag : name,
-      download: Uri.parse(asset['browser_download_url'] as String),
-      size: (asset['size'] as num?)?.toInt() ?? 0,
+      download: Uri.parse('${json['download']}'),
+      size: (json['size'] as num?)?.toInt() ?? 0,
+      sha256: '${json['sha256'] ?? ''}',
+      notes: '${json['notes'] ?? ''}',
     );
   }
 
-  static Future<File> download(AppUpdate update, {void Function(double progress)? onProgress}) async {
-    final dir = Directory(p.join((await getTemporaryDirectory()).path, 'zerk_play_update'));
+  static Future<File> download(
+    AppUpdate update, {
+    void Function(double progress)? onProgress,
+  }) async {
+    final asset = p.basename(update.download.path);
+    final name = asset.isEmpty ? 'aushd-update.bin' : asset;
+    final dir = Directory(p.join((await getTemporaryDirectory()).path, 'aushd_update'));
     if (await dir.exists()) await dir.delete(recursive: true);
     await dir.create(recursive: true);
-    final file = File(p.join(dir.path, _assetName));
+    final file = File(p.join(dir.path, name));
     final client = http.Client();
     try {
       final res = await client.send(http.Request('GET', update.download));
@@ -78,7 +110,16 @@ abstract final class Updater {
       } finally {
         await sink.close();
       }
-      if (total > 0 && received != total) throw const HttpException('The download was cut short');
+      if (total > 0 && received != total) {
+        throw const HttpException('The download was cut short');
+      }
+      if (update.sha256.isNotEmpty) {
+        final digest = await sha256.bind(file.openRead()).last;
+        if (digest.toString().toLowerCase() != update.sha256.toLowerCase()) {
+          await file.delete();
+          throw const HttpException('Checksum mismatch: download was discarded.');
+        }
+      }
       debugPrint('[update] downloaded $received bytes to ${file.path}');
       return file;
     } finally {

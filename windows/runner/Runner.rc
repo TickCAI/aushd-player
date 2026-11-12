@@ -63,13 +63,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "cloud.zerk" "\0"
-            VALUE "FileDescription", "zerk_play" "\0"
+            VALUE "CompanyName", "AusHD" "\0"
+            VALUE "FileDescription", "AusHD Player" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "zerk_play" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 cloud.zerk. All rights reserved." "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 AusHD. Licensed under GNU GPL v3.0." "\0"
             VALUE "OriginalFilename", "zerk_play.exe" "\0"
-            VALUE "ProductName", "zerk_play" "\0"
+            VALUE "ProductName", "AusHD Player" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

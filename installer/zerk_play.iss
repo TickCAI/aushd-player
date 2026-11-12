@@ -1,5 +1,5 @@
-#define AppName "Zerk Play"
-#define AppVersion "2.0.8"
+#define AppName "AusHD Player"
+#define AppVersion "1.0.0"
 #define AppExe "zerk_play.exe"
 #define BuildDir "..\build\windows\x64\runner\Release"
 #if DirExists(GetEnv("SystemRoot") + "\Sysnative")
@@ -9,12 +9,12 @@
 #endif
 
 [Setup]
-AppId={{0A38532D-CE9A-41F1-A775-57961FAB535B}
+AppId={{F76AE65C-640F-47CD-98F2-744A3C3396F5}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppVerName={#AppName} {#AppVersion}
-AppPublisher=cloud.zerk
-AppPublisherURL=https://github.com/florinp93/Zerk-Play-2.0
+AppPublisher=AusHD
+AppPublisherURL=https://github.com/aushd/aushd-player
 DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
@@ -27,7 +27,7 @@ SetupIconFile=..\windows\runner\resources\app_icon.ico
 UninstallDisplayIcon={app}\{#AppExe}
 UninstallDisplayName={#AppName}
 OutputDir=..\build\installer
-OutputBaseFilename=ZerkPlay-{#AppVersion}-setup
+OutputBaseFilename=AusHD-Player-{#AppVersion}-setup
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern

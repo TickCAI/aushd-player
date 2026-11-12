@@ -1,7 +1,7 @@
 name: zerk_play
-description: Emby / Jellyfin client with *seerr requests.
+description: AusHD Player - Chinese-localized Emby / Jellyfin client (fork of Zerk Play 2.0).
 publish_to: 'none'
-version: 2.0.8+21
+version: 1.0.0+1
 
 environment:
   sdk: ^3.13.0
@@ -11,6 +11,7 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
+  crypto: ^3.0.6
   ffi: ^2.1.4
   http: ^1.5.0
   intl: any
@@ -35,3 +36,4 @@ flutter:
     - assets/mpv/
     - assets/mpv/fonts/
     - assets/sounds/
+    - assets/brand/
