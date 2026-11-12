@@ -84,6 +84,13 @@ ADMIN_TOKEN=xxx PUBLIC_BASE_URL=https://你的域名 npm start
 - **Linux**：tar.gz **不内置** libmpv，播放视频前需安装系统包，例如 `sudo apt install libmpv-2`（Debian/Ubuntu）或 `sudo pacman -S mpv`（Arch）。
 - **Android TV**：APK 已内置 Media3 / FFmpeg，无需额外依赖。
 
+## 显示设置排障（HDR）
+
+播放 HDR 视频时，应用默认会自动打开 Windows HDR（可在 设置 → 播放器 关闭「HDR 自动开启」），播放结束或应用退出时恢复。若应用崩溃导致桌面持续发灰发白（HDR 状态跨重启持久），有两个恢复途径：
+
+1. 重新打开 AusHD Player：应用启动时会检测到上次异常退出遗留的 HDR 状态并**自动关闭**（v1.0.1 起，崩溃安全守卫）；
+2. 手动：设置 → 系统 → 屏幕 → 关闭「使用 HDR」。若仍发灰，检查 设置 → 辅助功能 → 颜色滤镜 是否被开启。
+
 ## 本地化
 
 - `l10n.yaml` 以 `app_en.arb` 为模板生成 `L10n`；新增 `app_zh.arb` 即自动加入支持语言。

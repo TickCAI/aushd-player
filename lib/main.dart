@@ -9,6 +9,7 @@ import 'app/app_services.dart';
 import 'core/host.dart';
 import 'core/log/app_log.dart';
 import 'core/log/perf_bench.dart';
+import 'playback/display_guard.dart';
 import 'playback/kept_display.dart';
 import 'playback/media3/media3_smoke.dart';
 import 'playback/mpv/mpv_backend.dart';
@@ -32,6 +33,9 @@ Future<void> main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppLog.init();
   AppLog.watchFrames();
+  // Undo display changes a crashed run left behind (Windows HDR persists
+  // across reboots and makes the whole desktop look washed out).
+  if (Host.isWindows) await DisplayGuard.recoverOnStartup();
   WidgetsBinding.instance.addPostFrameCallback((_) => AppLog.mark('first frame'));
   if (Host.isWindows) await _initWindow();
   final services = await AppServices.create();

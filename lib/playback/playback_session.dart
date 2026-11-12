@@ -9,6 +9,7 @@ import '../core/windows/native_window.dart';
 import '../core/emby/models/media_source.dart';
 import '../l10n/app_localizations.dart';
 import 'emby_playback_api.dart';
+import 'display_guard.dart';
 import 'kept_display.dart';
 import 'language.dart';
 import 'player_backend.dart';
@@ -863,6 +864,9 @@ final class PlaybackSession {
       return;
     }
     _hdrAutoEnabled = true;
+    // Persist before anything else: if the app crashes while HDR is on, the
+    // next launch undoes it (Windows keeps the HDR setting across reboots).
+    await DisplayGuard.markHdrAutoEnabled();
     await NativeWindow.waitForHdr(true);
     await Future<void>.delayed(const Duration(milliseconds: 600));
   }
@@ -952,6 +956,7 @@ final class PlaybackSession {
       } else {
         debugPrint('[session] turning Windows HDR back off');
         unawaited(NativeWindow.setHdr(false));
+        unawaited(DisplayGuard.clear());
       }
     }
 

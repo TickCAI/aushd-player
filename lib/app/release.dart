@@ -1,7 +1,7 @@
 abstract final class Release {
   /// Version shown in Settings and sent to the distribution service.
-  static const name = 'AusHD Player 1.0.0';
-  static const tag = 'v1.0.0';
+  static const name = 'AusHD Player 1.0.1';
+  static const tag = 'v1.0.1';
 
   /// Build-time configuration. GitHub Actions injects these with --dart-define.
   ///

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../core/windows/native_window.dart';
+import 'display_guard.dart';
 
 abstract final class KeptDisplay {
   static void Function()? restoreRefresh;
@@ -18,6 +19,7 @@ abstract final class KeptDisplay {
       hdrOn = false;
       debugPrint('[display] turning Windows HDR back off');
       await NativeWindow.setHdr(false);
+      await DisplayGuard.clear();
     }
   }
 }
