@@ -10,18 +10,57 @@ on:
         description: 'Version tag to build (e.g. v1.0.0)'
         required: true
         default: 'v1.0.0'
+      skip_distribution:
+        description: 'Build only (no DIST_URL needed); updater and hub stay disabled'
+        type: boolean
+        default: true
 
 permissions:
   contents: write
 
 env:
   TAG: ${{ inputs.tag || github.ref_name }}
-  DIST_URL: ${{ secrets.DIST_URL || 'https://dist.example.com' }}
+  DIST_URL: ${{ secrets.DIST_URL }}
+  HUB_URL: ${{ secrets.HUB_URL }}
   ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+  # Tag pushes always ship a configured client. Manual runs may opt into a
+  # build-only package with the distribution layer switched off.
+  REQUIRE_DIST: ${{ github.event_name == 'push' || inputs.skip_distribution == false }}
 
 jobs:
+  preflight:
+    name: Validate distribution config
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check DIST_URL
+        if: env.REQUIRE_DIST == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${DIST_URL:-}" ]]; then
+            echo "::error::Secret DIST_URL is missing. Set it to the public URL of your distribution service, or trigger this workflow manually with 'Build only' enabled."
+            exit 1
+          fi
+          if [[ ! "$DIST_URL" =~ ^https://[^/]+ ]] && [[ ! "$DIST_URL" =~ ^http://[^/]+ ]]; then
+            echo "::error::DIST_URL must be a full http(s) URL: $DIST_URL"
+            exit 1
+          fi
+          host="${DIST_URL#*://}"; host="${host%%/*}"; host="${host%%:*}"
+          case "$host" in
+            example.com|*.example.com|example.org|*.example.org|example.net|*.example.net|*.invalid|localhost|127.0.0.1)
+              echo "::error::DIST_URL points at a placeholder or loopback host ($host). Use a publicly reachable address."
+              exit 1 ;;
+          esac
+          echo "Distribution URL accepted: $DIST_URL"
+      - name: Build-only mode
+        if: env.REQUIRE_DIST != 'true'
+        shell: bash
+        run: |
+          echo "Build-only mode - AUSHD_DIST_URL and AUSHD_HUB_URL are empty; updater and hub stay disabled."
+
   build:
     name: Build ${{ matrix.platform }}
+    needs: preflight
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -56,8 +95,13 @@ jobs:
       - name: Inject distribution config
         shell: bash
         run: |
-          echo "AUSHD_DIST_URL=$DIST_URL" >> "$GITHUB_ENV"
-          echo "AUSHD_HUB_URL=$DIST_URL" >> "$GITHUB_ENV"
+          if [[ "$REQUIRE_DIST" == "true" ]]; then
+            echo "AUSHD_DIST_URL=$DIST_URL" >> "$GITHUB_ENV"
+            echo "AUSHD_HUB_URL=$HUB_URL" >> "$GITHUB_ENV"
+          else
+            echo "AUSHD_DIST_URL=" >> "$GITHUB_ENV"
+            echo "AUSHD_HUB_URL=" >> "$GITHUB_ENV"
+          fi
 
       # ---------------- Windows ----------------
       - name: Install Inno Setup
@@ -168,7 +212,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Register artifacts with distribution service
-        if: env.DIST_URL != 'https://dist.example.com' && env.ADMIN_TOKEN != ''
+        if: env.DIST_URL != '' && env.ADMIN_TOKEN != ''
         shell: bash
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}

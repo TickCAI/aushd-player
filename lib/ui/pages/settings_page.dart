@@ -720,7 +720,7 @@ class _SettingsPageState extends State<SettingsPage> {
               icon: Icons.outbox_rounded,
               onSelect: () => _sendLogs(context),
             ),
-          if (!Updater.playStore)
+          if (Updater.supported)
             SettingActionRow(
               title: l10n.checkForUpdates,
               icon: Icons.system_update_rounded,

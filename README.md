@@ -39,23 +39,29 @@
 
 ## 构建（不在本地进行）
 
-本项目**不要求本地安装 Flutter/Dart**。推送 `v*` tag 或手动触发工作流即可：
+本项目**不要求本地安装 Flutter/Dart**，全部由 `.github/workflows/build.yml` 并行构建 Windows（Inno Setup）、Linux（tar.gz）、Android TV（APK）。
+
+**两种模式**
+
+| 触发方式 | 是否需要 Secret | 产物 |
+| --- | --- | --- |
+| 手动触发，保持 `skip_distribution` 勾选（默认） | 不需要 | 纯构建包；更新器、hub、日志上传静默关闭，适合先验证 Dart 能否编译并本地试用 |
+| 推送 `v*` tag，或手动触发时取消勾选 | `DIST_URL` 必填 | 完整发布包；创建 GitHub Release 并把产物登记到分发服务，客户端开启自更新 |
 
 ```bash
 git tag v1.0.0
 git push origin v1.0.0
 ```
 
-`.github/workflows/build.yml` 会并行构建 Windows（Inno Setup 安装包）、Linux（tar.gz）、Android TV（APK），创建 GitHub Release，并在配置好 Secrets 后把产物登记到分发服务。
-
-需要在仓库 Settings → Secrets 中配置：
+**Secrets**（Settings → Secrets and variables → Actions）
 
 | Secret | 说明 |
 | --- | --- |
-| `DIST_URL` | 分发服务对外 HTTPS 地址，注入客户端 `AUSHD_DIST_URL` / `AUSHD_HUB_URL` |
-| `ADMIN_TOKEN` | 分发服务管理 token，用于登记版本 |
+| `DIST_URL` | 完整发布时必填。分发服务对外 https 地址，注入 `AUSHD_DIST_URL`。`preflight` 会校验格式，并拒绝 `example.com`、`localhost` 等占位地址 |
+| `HUB_URL` | 可选。注入 `AUSHD_HUB_URL`；留空时求片、一起看、云端配置、重新下载全部关闭，客户端完全离线可用 |
+| `ADMIN_TOKEN` | 可选但推荐。用于把构建产物登记到分发服务；不配则跳过登记，客户端查不到新版本 |
 
-未配置时仍会构建并发布 GitHub Release，只是跳过登记步骤，客户端会使用占位地址。
+`preflight` 不通过时工作流直接失败，不会产生"构建成功但客户端指向死域名"的包。完整步骤见 [`docs/A路径-首次构建与部署.md`](docs/A路径-首次构建与部署.md)。
 
 ## 分发后端
 
@@ -63,9 +69,12 @@ git push origin v1.0.0
 
 ```bash
 cd server
-npm test                 # 端到端自测
-ADMIN_TOKEN=xxx PUBLIC_BASE_URL=https://dist.example.com npm start
+npm test                 # 18 项端到端自测
+npm run check:deploy -- --url https://你的域名   # 部署后自检 6 项
+ADMIN_TOKEN=xxx PUBLIC_BASE_URL=https://你的域名 npm start
 ```
+
+`https://dist.example.com` 只是示例占位，**必须替换成真实域名**：CI 的 `preflight` 与客户端都会拒绝 example.com。
 
 客户端 `lib/services/updater/updater.dart` 读取 `GET /api/releases/latest`，下载后按 `sha256` 流式校验，再静默安装；不再访问上游作者的 GitHub releases。
 
@@ -73,8 +82,8 @@ ADMIN_TOKEN=xxx PUBLIC_BASE_URL=https://dist.example.com npm start
 
 - `l10n.yaml` 以 `app_en.arb` 为模板生成 `L10n`；新增 `app_zh.arb` 即自动加入支持语言。
 - `lib/app/app_settings.dart` 中 `uiLanguages`、`metadataLanguages`、UI→TMDB 语言映射为硬编码常量，已同步加入中文。
-- `lib/l10n/tag_names_zh.dart`（TMDB 关键词中文映射）待第二批接入，接入点是 `lib/ui/pages/title_extras.dart`。
-- 中文字体、日期格式、10-foot UI 回归与简体/繁体拆分见项目目录下的《本地化方案.md》。
+- `lib/l10n/tag_names_ro.dart` 的 TMDB 关键词映射按约定保留英文，不新增中文映射；接入点是 `lib/ui/pages/title_extras.dart`。
+- 中文日期格式已生效；中文字体打包、10-foot UI 回归与简体/繁体拆分仍待处理，见项目目录下的《本地化方案.md》与 [`docs/A路径-首次构建与部署.md`](docs/A路径-首次构建与部署.md) 的回归清单。
 
 ## 合规提醒
 

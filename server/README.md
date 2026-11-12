@@ -21,9 +21,12 @@ AusHD 分发服务  ──GET /api/releases/latest──▶  客户端 Updater
 ```bash
 cd server
 npm test                 # 18 项端到端自测
+npm run check:deploy -- --url https://你的域名   # 部署后自检 6 项
 ADMIN_TOKEN=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))") \
-PUBLIC_BASE_URL=https://dist.example.com npm start
+PUBLIC_BASE_URL=https://你的域名 npm start
 ```
+
+`https://dist.example.com` 只是示例占位，**务必替换成真实对外地址**；CI 的 `preflight` 和客户端都会拒绝 example.com / localhost。`check:deploy` 会检查健康检查、三平台版本接口、兑换码协议与管理接口鉴权，通过后才把这个地址填进 GitHub Secret `DIST_URL`。
 
 或 Docker：
 

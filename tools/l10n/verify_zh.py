@@ -42,6 +42,18 @@ NO_HAN_OK = {
     'calendarDay', 'calendarMonth', 'calendarMore',
 }
 
+# Upstream-specific calls to action this fork deliberately removes. Each entry
+# is an explicit, auditable exception: only the listed proper noun may be
+# absent from the listed key. Everything else still fails the gate.
+INTENTIONAL_DROPS = {
+    'sendLogsHint': {
+        'Discord': 'logs go to the self-hosted service, not the upstream Discord',
+    },
+    'sendLogsDoneBody': {
+        'Discord': 'this fork has no official Discord channel',
+    },
+}
+
 en = json.load(open(EN, encoding='utf-8'))
 zh = json.load(open(ZH, encoding='utf-8'))
 en_keys = [k for k in en if not k.startswith('@')]
@@ -67,6 +79,8 @@ for k in en_keys:
             errors.append(f'ICU branch mismatch: {k} | {sorted(be)} => {sorted(bz)}')
     for word in KEEP:
         if word in e and word not in z:
+            if word in INTENTIONAL_DROPS.get(k, {}):
+                continue
             errors.append(f'proper noun lost: {k} | {word} missing in "{z}"')
     if 'Zerk' in z or 'zerkplay' in z:
         errors.append(f'upstream brand leaked: {k} => {z}')
@@ -80,7 +94,11 @@ print(f'keys: en={len(en_keys)} zh={len(zh_keys)}')
 print(f'localised values: {localised_coverage}/{len(en_keys)} '
       f'({localised_coverage * 100 // len(en_keys)}%)')
 print(f'unchanged (symbol-only) keys: {len(identical)} -> {identical}')
-print(f'KEEP whitelist: {len(KEEP)} | LOCALISED exceptions: {len(LOCALISED)}')
+print(f'KEEP whitelist: {len(KEEP)} | LOCALISED exceptions: {len(LOCALISED)} '
+      f'| intentional drops: {sum(len(v) for v in INTENTIONAL_DROPS.values())}')
+for k, drops in INTENTIONAL_DROPS.items():
+    for word, reason in drops.items():
+        print(f'  DROP {k}: {word} ({reason})')
 print(f'warnings: {len(warnings)}')
 for w in warnings:
     print('  WARN', w)

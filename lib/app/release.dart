@@ -4,12 +4,34 @@ abstract final class Release {
   static const tag = 'v1.0.0';
 
   /// Build-time configuration. GitHub Actions injects these with --dart-define.
-  /// Local defaults point at a local distribution server so a dev build never
-  /// talks to the upstream author's services.
+  ///
+  /// An empty value is a valid, intentional state: "no self-hosted service is
+  /// configured". In that state the updater, hub link and log upload stay
+  /// dormant instead of talking to a placeholder host or to the upstream
+  /// author's services. Local development may point these at 127.0.0.1.
   static const channel = String.fromEnvironment('AUSHD_CHANNEL', defaultValue: 'stable');
   static const distributionApi =
-      String.fromEnvironment('AUSHD_DIST_URL', defaultValue: 'http://127.0.0.1:8787');
-  static const hub = String.fromEnvironment('AUSHD_HUB_URL', defaultValue: 'http://127.0.0.1:8787');
+      String.fromEnvironment('AUSHD_DIST_URL', defaultValue: '');
+  static const hub = String.fromEnvironment('AUSHD_HUB_URL', defaultValue: '');
+
+  /// Reject empty values, malformed URLs and documentation placeholders so a
+  /// misconfigured CI run can never ship a client pointing at a dead domain.
+  static bool isUsableUrl(String raw) {
+    final value = raw.trim();
+    if (value.isEmpty) return false;
+    final uri = Uri.tryParse(value);
+    if (uri == null || !uri.hasScheme || uri.host.isEmpty) return false;
+    if (uri.scheme != 'http' && uri.scheme != 'https') return false;
+    final host = uri.host.toLowerCase();
+    const reserved = ['example.com', 'example.org', 'example.net', 'invalid'];
+    for (final domain in reserved) {
+      if (host == domain || host.endsWith('.$domain')) return false;
+    }
+    return true;
+  }
+
+  static bool get distributionConfigured => isUsableUrl(distributionApi);
+  static bool get hubConfigured => isUsableUrl(hub);
 
   /// Kept for diagnostics / release links. The updater no longer queries the
   /// upstream GitHub repository directly (see services/updater/updater.dart).

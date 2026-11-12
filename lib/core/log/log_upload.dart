@@ -20,7 +20,7 @@ final class LogUploadException implements Exception {
 abstract final class LogUpload {
   static const _perFile = 700 * 1024;
 
-  static bool get available => Release.hub.isNotEmpty && AppLog.directory != null;
+  static bool get available => Release.hubConfigured && AppLog.directory != null;
 
   static Future<String> send({String? note}) async {
     await AppLog.flush();

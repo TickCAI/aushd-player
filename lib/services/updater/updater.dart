@@ -41,7 +41,8 @@ abstract final class Updater {
   static const _channel = MethodChannel('zerk/updater');
 
   static const playStore = bool.fromEnvironment('PLAY_STORE');
-  static bool get supported => !playStore && (Host.isWindows || Host.isAndroid);
+  static bool get supported =>
+      !playStore && Release.distributionConfigured && (Host.isWindows || Host.isAndroid);
 
   static String get _platform =>
       Host.isWindows ? 'windows' : Host.isAndroid ? 'androidtv' : 'linux';
@@ -55,6 +56,10 @@ abstract final class Updater {
   }
 
   static Future<AppUpdate?> check() async {
+    // No distribution service configured: stay completely silent. This keeps
+    // self-built copies usable offline and avoids a network request to a
+    // placeholder host on every launch.
+    if (!Release.distributionConfigured) return null;
     final url = Uri.parse(_endpoint('/api/releases/latest')).replace(
       queryParameters: {
         'platform': _platform,

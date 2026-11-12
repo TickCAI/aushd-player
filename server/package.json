@@ -10,6 +10,7 @@
   "scripts": {
     "start": "node src/server.js",
     "publish": "node scripts/publish.js",
+    "check:deploy": "node scripts/check-deploy.js",
     "test": "node test/smoke.js"
   },
   "license": "GPL-3.0-or-later"

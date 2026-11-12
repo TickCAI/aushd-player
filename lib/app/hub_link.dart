@@ -111,7 +111,13 @@ abstract final class HubLink {
 
   static Uri? get base => _config?.base;
 
-  static HubFeatures get features => _config?.features ?? const HubFeatures();
+  /// True only when a usable hub address exists. An unconfigured build keeps
+  /// every hub-driven feature off, even if a stale link is stored locally.
+  static bool get configured =>
+      Release.isUsableUrl(hub.contains('://') ? hub : 'https://$hub');
+
+  static HubFeatures get features =>
+      configured ? (_config?.features ?? const HubFeatures()) : const HubFeatures();
 
   static String? get code => _code;
 
@@ -136,13 +142,17 @@ abstract final class HubLink {
   static bool get due {
     final at = _linkedAt;
     final config = _config;
-    return config != null && (at == null || DateTime.now().difference(at) > config.refreshAfter);
+    return config != null && configured &&
+        (at == null || DateTime.now().difference(at) > config.refreshAfter);
   }
 
   static Uri _endpoint(String hub) {
     var h = hub.trim();
     if (!h.contains('://')) h = 'https://$h';
-    final uri = Uri.parse(h);
+    final uri = Uri.tryParse(h);
+    if (uri == null || uri.host.isEmpty) {
+      throw const HubLinkException('bad-hub', '服务端地址无效，请填写完整的 http(s) 地址。');
+    }
     return uri.replace(path: '/api/app/link', query: null, fragment: null);
   }
 
@@ -154,7 +164,9 @@ abstract final class HubLink {
       await prefs.setString('hub.deviceId', device);
     }
     final target = (hub == null || hub.trim().isEmpty) ? defaultHub : hub.trim();
-    if (target.isEmpty) throw const HubLinkException('no-hub', 'Enter the hub address your server owner gave you.');
+    if (!Release.isUsableUrl(target.contains('://') ? target : 'https://$target')) {
+      throw const HubLinkException('no-hub', '尚未配置服务端地址，请先填写分发服务提供的地址。');
+    }
     final http.Response res;
     try {
       res = await http
@@ -173,7 +185,7 @@ abstract final class HubLink {
           )
           .timeout(const Duration(seconds: 20));
     } catch (e) {
-      throw HubLinkException('unreachable', 'Could not reach $target. Check your connection and try again.');
+      throw HubLinkException('unreachable', '无法连接 $target，请检查网络或地址后重试。');
     }
     Object? json;
     try {
@@ -183,11 +195,11 @@ abstract final class HubLink {
     }
     if (res.statusCode != 200 || json is! Map<String, Object?>) {
       final map = json is Map ? json : const {};
-      throw HubLinkException('${map['code'] ?? 'http-${res.statusCode}'}', '${map['message'] ?? 'The hub answered ${res.statusCode}.'}');
+      throw HubLinkException('${map['code'] ?? 'http-${res.statusCode}'}', '${map['message'] ?? '服务端返回 ${res.statusCode}。'}');
     }
     final config = HubConfig(json);
     if (config.serverUrl.isEmpty || config.base == null) {
-      throw const HubLinkException('bad-config', 'The hub sent an incomplete setup.');
+      throw const HubLinkException('bad-config', '服务端下发的配置不完整，请联系服务提供者。');
     }
     _config = config;
     _code = code;
@@ -205,7 +217,7 @@ abstract final class HubLink {
 
   static Future<HubConfig?> refresh() async {
     final code = _code;
-    if (code == null) return null;
+    if (code == null || !configured) return null;
     try {
       return await redeem(code, hub: _hub);
     } on HubLinkException catch (e) {
