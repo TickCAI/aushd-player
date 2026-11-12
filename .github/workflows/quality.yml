@@ -1,0 +1,88 @@
+name: Quality gate
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Unit & contract tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # Golden-file baselines are intentionally not wired up yet: this
+      # workstation has no Flutter/Dart SDK, so the reference images cannot be
+      # generated locally. M1 will add golden tests once the redesigned UI can
+      # be rendered with a real toolchain.
+      - name: Run tests (hard gate)
+        run: flutter test --reporter expanded
+
+  # `flutter test` only compiles libraries reachable from test/*. The playback
+  # refactor touches app entry points that no unit test imports, so a real
+  # full-app build is the only way to catch signature/import breakage there.
+  # Same toolchain as build.yml's Android job (which is known green).
+  compile:
+    name: Full app compile (Android debug)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate localizations
+        run: flutter gen-l10n
+
+      - name: Compile full app (hard gate)
+        run: flutter build apk --debug --dart-define=PLAY_STORE=false
+
+  analyze:
+    name: Static analysis (advisory)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # Advisory only: the repository still carries legacy lint findings that
+      # have not been cleared yet, so a failing analyze must not break CI.
+      # After M1 has cleaned them up, drop continue-on-error to make this a
+      # hard gate.
+      - name: Analyze
+        continue-on-error: true
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings

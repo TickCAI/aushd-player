@@ -8,6 +8,7 @@ import '../../playback/platform_player.dart';
 import '../../playback/playback_session.dart';
 import '../../playback/player_settings.dart';
 import '../../playback/trailer/trailer_player.dart';
+import '../player/navigator_osd_presenter.dart';
 import '../widgets/profile_widgets.dart';
 import '../widgets/trailer.dart';
 import 'artwork.dart';
@@ -56,7 +57,7 @@ Future<PlaybackOutcome?> playItem(
     final acceptBadCerts = services.settings.acceptInvalidCertificates;
     final session = PlaybackSession(
       player: createPlayer(
-        navigator: navigator,
+        presenter: NavigatorOsdPresenter(navigator),
         settings: settings,
         acceptInvalidCertificates: acceptBadCerts,
         l10n: l10n,
@@ -115,7 +116,7 @@ Future<void> playShared(BuildContext context, LiveShare share, {ZapList? zap, in
     final settings = await PlayerSettings.load();
     final session = LiveSession(
       player: createPlayer(
-        navigator: navigator,
+        presenter: NavigatorOsdPresenter(navigator),
         settings: settings,
         acceptInvalidCertificates: services.settings.acceptInvalidCertificates,
         l10n: l10n,

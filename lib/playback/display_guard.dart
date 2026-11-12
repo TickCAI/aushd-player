@@ -17,6 +17,18 @@ import '../core/windows/native_window.dart';
 abstract final class DisplayGuard {
   static const _key = 'display.guard.v1';
 
+  // Platform-call seams. Production keeps the original NativeWindow behaviour;
+  // tests swap these out so no real method-channel calls are made.
+  @visibleForTesting
+  static Future<DisplayHdrStatus> Function() status = NativeWindow.hdrStatus;
+
+  @visibleForTesting
+  static Future<bool> Function(bool enabled) setHdrState = NativeWindow.setHdr;
+
+  @visibleForTesting
+  static Future<bool> Function(bool enabled) waitForHdrState =
+      (enabled) => NativeWindow.waitForHdr(enabled);
+
   /// Persist "we switched Windows HDR on for playback" before anything else
   /// can go wrong. The state we are replacing is known: HDR was off, because
   /// [PlaybackSession] only enables it when it was off.
@@ -48,11 +60,11 @@ abstract final class DisplayGuard {
       if (raw == null) return;
       await prefs.remove(_key);
       if ((jsonDecode(raw) as Map<String, dynamic>)['hdr'] != true) return;
-      final status = await NativeWindow.hdrStatus();
-      if (!status.enabled) return;
+      final hdrStatus = await status();
+      if (!hdrStatus.enabled) return;
       debugPrint('[display-guard] previous run crashed with Windows HDR on; turning it off');
-      await NativeWindow.setHdr(false);
-      await NativeWindow.waitForHdr(false);
+      await setHdrState(false);
+      await waitForHdrState(false);
     } catch (e) {
       debugPrint('[display-guard] recovery failed: $e');
     }

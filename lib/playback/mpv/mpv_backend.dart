@@ -13,11 +13,11 @@ import '../../core/log/app_log.dart';
 import '../../core/windows/native_window.dart';
 import '../../l10n/app_localizations.dart';
 import '../../ui/core/gamepad.dart';
-import '../../ui/player/player_osd.dart';
 import '../../ui/widgets/net_image.dart';
 import '../dialogue_downmix.dart';
 import '../display_refresh.dart';
 import '../media3/osd_model.dart';
+import '../osd_presenter.dart';
 import '../player_backend.dart';
 import '../player_settings.dart';
 import '../trickplay.dart';
@@ -30,13 +30,13 @@ typedef _TrickFile = ({String path, int w, int h});
 
 final class MpvBackend implements PlayerBackend {
   MpvBackend({
-    required this._navigator,
+    required this._presenter,
     required this._settings,
     required this.l10n,
     this.acceptInvalidCertificates = false,
   });
 
-  final NavigatorState _navigator;
+  final OsdPresenter _presenter;
   final PlayerSettings _settings;
 
   final L10n l10n;
@@ -54,7 +54,6 @@ final class MpvBackend implements PlayerBackend {
     togglePause: () {},
     seekTo: (_) {},
   );
-  Route<void>? _route;
   bool _videoShown = false;
 
   bool _framed = false;
@@ -93,9 +92,7 @@ final class MpvBackend implements PlayerBackend {
     VideoHost.onInput = _mpv.commandAsync;
     _mpv.state.addListener(_onState);
 
-    final route = PlayerOsdRoute(model: _curtain, controls: false);
-    _route = route;
-    unawaited(_navigator.push(route));
+    _presenter.show(model: _curtain, controls: false);
 
     await _loadUserConfig();
     final script = _osdScriptPath();
@@ -244,9 +241,7 @@ final class MpvBackend implements PlayerBackend {
     if (Host.isLinux) await VideoHost.detach();
     _mpv.dispose();
     _resetTrickplay(null);
-    final route = _route;
-    _route = null;
-    if (route != null && route.isActive) _navigator.removeRoute(route);
+    _presenter.dismiss();
     _curtain.dispose();
     await _events.close();
   }

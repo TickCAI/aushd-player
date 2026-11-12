@@ -1,14 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/windows/native_window.dart' show DisplayHdrStatus;
 import '../../ui/core/tv_scale.dart';
-import '../../ui/player/player_osd.dart';
 import '../device_profile.dart' show androidEncodesAc3;
 import '../dialogue_downmix.dart';
+import '../osd_presenter.dart';
 import '../player_backend.dart';
 import '../player_settings.dart';
 import '../subtitle_delay.dart';
@@ -17,12 +16,12 @@ import 'device_caps.dart';
 import 'osd_model.dart';
 
 final class Media3Backend implements PlayerBackend {
-  Media3Backend({required this._navigator, required this._settings});
+  Media3Backend({required this._presenter, required this._settings});
 
   static const _channel = MethodChannel('zerk/player');
   static const _eventChannel = EventChannel('zerk/player/events');
 
-  final NavigatorState _navigator;
+  final OsdPresenter _presenter;
   PlayerSettings _settings;
   final _state = ValueNotifier(const PlayerState());
   final _events = StreamController<PlayerEvent>.broadcast(sync: true);
@@ -40,7 +39,6 @@ final class Media3Backend implements PlayerBackend {
     ..subtitleScale = _settings.subtitleScale
     ..downmix = _settings.stereoDownmix;
   StreamSubscription<Object?>? _sub;
-  Route<void>? _route;
 
   @override
   ValueListenable<PlayerState> get state => _state;
@@ -84,9 +82,7 @@ final class Media3Backend implements PlayerBackend {
     });
     _osd.subtitleLift.addListener(_liftSubtitles);
     TvScale.videoUnderlay.value = true;
-    final route = PlayerOsdRoute(model: _osd);
-    _route = route;
-    unawaited(_navigator.push(route));
+    _presenter.show(model: _osd);
   }
 
   @override
@@ -150,9 +146,7 @@ final class Media3Backend implements PlayerBackend {
   @override
   Future<void> close() async {
     await _sub?.cancel();
-    final route = _route;
-    _route = null;
-    if (route != null && route.isActive) _navigator.removeRoute(route);
+    _presenter.dismiss();
     TvScale.videoUnderlay.value = false;
     _osd.subtitleLift.removeListener(_liftSubtitles);
     await _channel.invokeMethod('close', {'keepRefresh': _settings.keepRefreshRate});

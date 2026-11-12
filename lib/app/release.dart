@@ -1,15 +1,13 @@
 abstract final class Release {
-  /// Version shown in Settings and sent to the distribution service.
-  static const name = 'AusHD Player 1.0.1';
-  static const tag = 'v1.0.1';
-
-  /// Build-time configuration. GitHub Actions injects these with --dart-define.
+  /// UI-redesign branch test series (v0.1 → v0.2 → …). Test packages ship
+  /// through a separate channel and never trigger the self-hosted updater.
   ///
-  /// An empty value is a valid, intentional state: "no self-hosted service is
-  /// configured". In that state the updater, hub link and log upload stay
-  /// dormant instead of talking to a placeholder host or to the upstream
-  /// author's services. Local development may point these at 127.0.0.1.
-  static const channel = String.fromEnvironment('AUSHD_CHANNEL', defaultValue: 'stable');
+  /// pubspec.yaml intentionally keeps a monotonic versionCode so a test build
+  /// can still be installed over v1.0.1 on Android; the user-visible version
+  /// is this one, not the pubspec version.
+  static const name = 'AusHD Player 0.1 测试版';
+  static const tag = 'v0.1';
+  static const channel = String.fromEnvironment('AUSHD_CHANNEL', defaultValue: 'beta');
   static const distributionApi =
       String.fromEnvironment('AUSHD_DIST_URL', defaultValue: '');
   static const hub = String.fromEnvironment('AUSHD_HUB_URL', defaultValue: '');

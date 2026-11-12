@@ -26,6 +26,7 @@ import 'ui/core/ui_sounds.dart';
 import 'ui/focus/focus_zone.dart';
 import 'ui/pages/onboarding_page.dart';
 import 'ui/pages/sign_in_page.dart';
+import 'ui/player/navigator_osd_presenter.dart';
 import 'ui/shell/shell.dart';
 import 'ui/theme/tokens.dart';
 
@@ -122,12 +123,15 @@ class _ZerkAppState extends State<ZerkApp> {
     final route = WidgetsBinding.instance.platformDispatcher.defaultRouteName;
     if (Host.isAndroid && route.startsWith('/dev-player')) {
       WidgetsBinding.instance.addPostFrameCallback(
-        (_) => runMedia3Smoke(_navigator.currentState!, subtitleBackground: route == '/dev-player-box'),
+        (_) => runMedia3Smoke(
+          presenter: NavigatorOsdPresenter(_navigator.currentState!),
+          subtitleBackground: route == '/dev-player-box',
+        ),
       );
     }
     if (Host.isDesktop && widget.playerSmoke) {
       WidgetsBinding.instance.addPostFrameCallback((_) => runPlayerSmoke(MpvBackend(
-            navigator: _navigator.currentState!,
+            presenter: NavigatorOsdPresenter(_navigator.currentState!),
             settings: const PlayerSettings(),
             l10n: lookupL10n(const Locale('en')),
           )));
