@@ -1,0 +1,28 @@
+name: TMDB key check
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Probe TMDB API with the embedded key
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query TMDB API
+        shell: bash
+        run: |
+          KEY="5c164a7eb020764869811ddc6177bb19"
+
+          echo "===== 1. /3/configuration (key validity) ====="
+          curl -sS --max-time 30 -o cfg.json -w "HTTP %{http_code}\n" \
+            "https://api.themoviedb.org/3/configuration?api_key=$KEY"
+          head -c 300 cfg.json; echo; echo
+
+          echo "===== 2. zh-CN metadata (what the app actually requests) ====="
+          curl -sS --max-time 30 -o mv.json -w "HTTP %{http_code}\n" \
+            "https://api.themoviedb.org/3/movie/550?api_key=$KEY&language=zh-CN"
+          head -c 500 mv.json; echo; echo
+
+          echo "===== 3. Control: deliberately invalid key ====="
+          curl -sS --max-time 30 -w "\nHTTP %{http_code}\n" \
+            "https://api.themoviedb.org/3/configuration?api_key=deliberately-invalid-key"
