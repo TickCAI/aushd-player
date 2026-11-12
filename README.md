@@ -78,6 +78,12 @@ ADMIN_TOKEN=xxx PUBLIC_BASE_URL=https://你的域名 npm start
 
 客户端 `lib/services/updater/updater.dart` 读取 `GET /api/releases/latest`，下载后按 `sha256` 流式校验，再静默安装；不再访问上游作者的 GitHub releases。
 
+## 运行时依赖
+
+- **Windows**：安装包已内置 `libmpv-2.dll`（CI 构建时从 [shinchiro/mpv-winbuild-cmake](https://github.com/shinchiro/mpv-winbuild-cmake) 下载，见 NOTICE），开箱即用。
+- **Linux**：tar.gz **不内置** libmpv，播放视频前需安装系统包，例如 `sudo apt install libmpv-2`（Debian/Ubuntu）或 `sudo pacman -S mpv`（Arch）。
+- **Android TV**：APK 已内置 Media3 / FFmpeg，无需额外依赖。
+
 ## 本地化
 
 - `l10n.yaml` 以 `app_en.arb` 为模板生成 `L10n`；新增 `app_zh.arb` 即自动加入支持语言。

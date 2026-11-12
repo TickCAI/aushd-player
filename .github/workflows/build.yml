@@ -104,6 +104,20 @@ jobs:
           fi
 
       # ---------------- Windows ----------------
+      - name: Fetch libmpv (Windows)
+        if: matrix.platform == 'windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p windows/libs
+          url=$(curl -sf https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases/latest | \
+            python -c "import json,sys,re; print(next(a['browser_download_url'] for a in json.load(sys.stdin)['assets'] if re.match(r'mpv-dev-x86_64-\d', a['name'])))")
+          echo "libmpv source: $url"
+          curl -sfL -o mpv-dev.7z "$url"
+          7z e -y -ompv-dev mpv-dev.7z '*.dll'
+          mv mpv-dev/libmpv-2.dll windows/libs/libmpv-2.dll
+          ls -lh windows/libs
+
       - name: Install Inno Setup
         if: matrix.platform == 'windows'
         shell: pwsh

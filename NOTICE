@@ -20,6 +20,11 @@ its own directory. This list is an index, not a re-licensing:
   Flutter SDK / Dart SDK / engine         BSD-3-Clause (Flutter distribution)
   mpv, libmpv and bundled Lua scripts    LGPL-2.1-or-later / GPL-2.0-or-later
                                          (see the mpv distribution used at build time)
+  Windows libmpv-2.dll                   downloaded at build time from
+                                         https://github.com/shinchiro/mpv-winbuild-cmake
+                                         (mpv + FFmpeg, GPL/LGPL; complete corresponding
+                                         source for the exact build is published in that
+                                         repository's release artifacts)
   assets/mpv/fonts/MaterialIcons-Player.otf
                                          Apache License 2.0 (Google Material Icons)
   android/app/src/main/cpp/aften/        see android/app/src/main/cpp/aften/COPYING
