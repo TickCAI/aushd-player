@@ -14,6 +14,12 @@ abstract final class Release {
       String.fromEnvironment('AUSHD_DIST_URL', defaultValue: '');
   static const hub = String.fromEnvironment('AUSHD_HUB_URL', defaultValue: '');
 
+  /// Default TMDB API key so metadata works out of the box for this
+  /// distribution. Users can override it in Settings; a build can replace it
+  /// with --dart-define=AUSHD_TMDB_KEY=...
+  static const tmdbApiKey =
+      String.fromEnvironment('AUSHD_TMDB_KEY', defaultValue: '5c164a7eb020764869811ddc6177bb19');
+
   /// Reject empty values, malformed URLs and documentation placeholders so a
   /// misconfigured CI run can never ship a client pointing at a dead domain.
   static bool isUsableUrl(String raw) {

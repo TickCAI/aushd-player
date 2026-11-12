@@ -519,8 +519,8 @@ class _Logo extends StatelessWidget {
                 padding: const EdgeInsets.only(left: 16),
                 child: Text.rich(
                   const TextSpan(children: [
-                    TextSpan(text: 'Zerk', style: TextStyle(fontWeight: FontWeight.w800)),
-                    TextSpan(text: ' Play', style: TextStyle(fontWeight: FontWeight.w400, color: Zc.textMuted)),
+                    TextSpan(text: 'AusHD', style: TextStyle(fontWeight: FontWeight.w800)),
+                    TextSpan(text: ' Player', style: TextStyle(fontWeight: FontWeight.w400, color: Zc.textMuted)),
                   ]),
                   maxLines: 1,
                   overflow: TextOverflow.clip,

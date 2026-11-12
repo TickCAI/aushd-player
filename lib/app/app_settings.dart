@@ -4,6 +4,7 @@ import 'dart:ui' show PlatformDispatcher;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/host.dart';
+import 'release.dart';
 
 
 const uiLanguages = {'zh': '简体中文', 'en': 'English', 'ro': 'Română', 'fr': 'Français', 'de': 'Deutsch', 'es': 'Español', 'pl': 'Polski'};
@@ -62,9 +63,9 @@ final class AppSettings {
   const AppSettings({
     this.seerrUrl = '',
     this.seerrApiKey = '',
-    this.tmdbApiKey = '',
+    this.tmdbApiKey = Release.tmdbApiKey,
     this.mdblistApiKey = '',
-    this.metadataLanguage = '',
+    this.metadataLanguage = 'zh-CN',
     this.sounds = true,
     this.hideAnimation = true,
     this.groupCollections = false,
@@ -222,9 +223,9 @@ final class AppSettings {
       return AppSettings(
         seerrUrl: j['seerrUrl'] as String? ?? '',
         seerrApiKey: j['seerrApiKey'] as String? ?? '',
-        tmdbApiKey: j['tmdbApiKey'] as String? ?? '',
+        tmdbApiKey: j['tmdbApiKey'] as String? ?? Release.tmdbApiKey,
         mdblistApiKey: j['mdblistApiKey'] as String? ?? '',
-        metadataLanguage: j['metadataLanguage'] as String? ?? '',
+        metadataLanguage: j['metadataLanguage'] as String? ?? 'zh-CN',
         sounds: j['sounds'] as bool? ?? true,
         hideAnimation: j['hideAnimation'] as bool? ?? true,
         groupCollections: j['groupCollections'] as bool? ?? false,

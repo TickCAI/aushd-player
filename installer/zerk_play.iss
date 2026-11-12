@@ -14,7 +14,7 @@ AppName={#AppName}
 AppVersion={#AppVersion}
 AppVerName={#AppName} {#AppVersion}
 AppPublisher=AusHD
-AppPublisherURL=https://github.com/aushd/aushd-player
+AppPublisherURL=https://github.com/TickCAI/aushd-player
 DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
@@ -31,10 +31,12 @@ OutputBaseFilename=AusHD-Player-{#AppVersion}-setup
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
+ShowLanguageDialog=no
 CloseApplications=yes
 RestartApplications=no
 
 [Languages]
+Name: "chinesesimplified"; MessagesFile: "ChineseSimplified.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]

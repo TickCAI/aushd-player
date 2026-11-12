@@ -11,7 +11,7 @@ import 'player_settings.dart';
 import 'trickplay.dart';
 
 const _iconUrl =
-    'https://raw.githubusercontent.com/florinp93/Zerk-Play-2.0/main/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png';
+    'https://raw.githubusercontent.com/TickCAI/aushd-player/main/assets/brand/aushd-mark.png';
 
 enum PlayMethod { directPlay, directStream, transcode }
 

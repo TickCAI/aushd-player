@@ -69,7 +69,7 @@ Map<String, String> buildMpvOptions({
     'demuxer-readahead-secs': '60',
     'stream-buffer-size': '4MiB',
     'network-timeout': '30',
-    'user-agent': 'ZerkPlay/2.0 (${linux ? 'Linux' : 'Windows'}; libmpv)',
+    'user-agent': 'AusHDPlayer/1.0 (${linux ? 'Linux' : 'Windows'}; libmpv)',
     'tls-verify': acceptInvalidCertificates ? 'no' : 'yes',
 
     'audio-spdif': spdif,
