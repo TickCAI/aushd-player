@@ -14,18 +14,27 @@ on:
         description: 'Build only (no DIST_URL needed); updater and hub stay disabled'
         type: boolean
         default: true
+      test_release:
+        description: '勾选用 v0.1 测试版号构建并发布 Release，跳过 DIST_URL 检查'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
 
 env:
   TAG: ${{ inputs.tag || github.ref_name }}
+  TEST_MODE: ${{ inputs.test_release == true }}
+  BUILD_CHANNEL: ${{ inputs.test_release == true && 'beta' || 'stable' }}
   DIST_URL: ${{ secrets.DIST_URL }}
   HUB_URL: ${{ secrets.HUB_URL }}
   ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
   # Tag pushes always ship a configured client. Manual runs may opt into a
-  # build-only package with the distribution layer switched off.
-  REQUIRE_DIST: ${{ github.event_name == 'push' || inputs.skip_distribution == false }}
+  # build-only package with the distribution layer switched off. Test-release
+  # runs (workflow_dispatch + test_release) always skip the DIST_URL check:
+  # they build on the beta channel, never contact the self-hosted updater, and
+  # are published to GitHub Releases only.
+  REQUIRE_DIST: ${{ (github.event_name == 'push' || inputs.skip_distribution == false) && !(github.event_name == 'workflow_dispatch' && inputs.test_release == true) }}
 
 jobs:
   preflight:
@@ -56,7 +65,11 @@ jobs:
         if: env.REQUIRE_DIST != 'true'
         shell: bash
         run: |
-          echo "Build-only mode - AUSHD_DIST_URL and AUSHD_HUB_URL are empty; updater and hub stay disabled."
+          echo "Build-only / test-release mode"
+          echo "AUSHD_DIST_URL and AUSHD_HUB_URL are empty; updater and hub stay disabled"
+          if [[ "${TEST_MODE:-false}" == "true" ]]; then
+            echo "Test-release mode: tag=$TAG channel=$BUILD_CHANNEL - beta channel, no self-hosted updater, no distribution registration, GitHub Release only"
+          fi
 
   build:
     name: Build ${{ matrix.platform }}
@@ -132,7 +145,7 @@ jobs:
             --build-name="$V" --build-number=1 \
             --dart-define=AUSHD_DIST_URL="$AUSHD_DIST_URL" \
             --dart-define=AUSHD_HUB_URL="$AUSHD_HUB_URL" \
-            --dart-define=AUSHD_CHANNEL=stable
+            --dart-define=AUSHD_CHANNEL=${{ env.BUILD_CHANNEL }}
 
       - name: Package Windows installer
         if: matrix.platform == 'windows'
@@ -169,7 +182,7 @@ jobs:
             --build-name="$V" --build-number=1 \
             --dart-define=AUSHD_DIST_URL="$AUSHD_DIST_URL" \
             --dart-define=AUSHD_HUB_URL="$AUSHD_HUB_URL" \
-            --dart-define=AUSHD_CHANNEL=stable
+            --dart-define=AUSHD_CHANNEL=${{ env.BUILD_CHANNEL }}
           SKIP_BUILD=1 VERSION="$V" bash linux/packaging/make-tarball.sh
           mkdir -p dist
           cp build/linux/package/*.tar.gz "dist/AusHD-Player-${V}-Linux-x64.tar.gz"
@@ -192,7 +205,7 @@ jobs:
             --dart-define=PLAY_STORE=false \
             --dart-define=AUSHD_DIST_URL="$AUSHD_DIST_URL" \
             --dart-define=AUSHD_HUB_URL="$AUSHD_HUB_URL" \
-            --dart-define=AUSHD_CHANNEL=stable
+            --dart-define=AUSHD_CHANNEL=${{ env.BUILD_CHANNEL }}
           mkdir -p dist
           cp build/app/outputs/flutter-apk/app-release.apk "dist/AusHD-Player-${V}-AndroidTV.apk"
           ls -lh dist
@@ -219,14 +232,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG }}
-          name: AusHD Player ${{ env.TAG }}
+          name: AusHD Player ${{ env.TAG }}${{ inputs.test_release == true && ' 测试版' || '' }}
           generate_release_notes: true
           files: artifacts/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Register artifacts with distribution service
-        if: env.DIST_URL != '' && env.ADMIN_TOKEN != ''
+        if: env.DIST_URL != '' && env.ADMIN_TOKEN != '' && env.TEST_MODE != 'true'
         shell: bash
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}

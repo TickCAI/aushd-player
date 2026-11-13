@@ -8,6 +8,7 @@ import 'package:window_manager/window_manager.dart';
 import 'app/app_services.dart';
 import 'core/host.dart';
 import 'core/log/app_log.dart';
+import 'core/log/diagnostics.dart';
 import 'core/log/perf_bench.dart';
 import 'playback/display_guard.dart';
 import 'playback/kept_display.dart';
@@ -29,10 +30,13 @@ import 'ui/pages/sign_in_page.dart';
 import 'ui/player/navigator_osd_presenter.dart';
 import 'ui/shell/shell.dart';
 import 'ui/theme/tokens.dart';
+import 'ui/theme2/adaptive_shell.dart';
+import 'ui/theme2/device_form.dart';
 
 Future<void> main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppLog.init();
+  Diagnostics.install();
   AppLog.watchFrames();
   // Undo display changes a crashed run left behind (Windows HDR persists
   // across reboots and makes the whole desktop look washed out).
@@ -80,6 +84,9 @@ Future<void> _initWindow() async {
 }
 
 class ZerkApp extends StatefulWidget {
+  /// --dart-define=AUSHD_LEGACY_UI=true 时瞬时回退到 v1.0.1 的旧壳。
+  static const legacyUi = bool.fromEnvironment('AUSHD_LEGACY_UI', defaultValue: false);
+
   const ZerkApp({
     super.key,
     this.initialTab = ShellTab.home,
@@ -175,7 +182,9 @@ class _ZerkAppState extends State<ZerkApp> {
           ? const SignInPage()
           : !services.settings.onboarded
               ? const OnboardingPage(key: ValueKey('onboarding'))
-              : Shell(key: const ValueKey('shell'), initialTab: widget.initialTab),
+              : ZerkApp.legacyUi
+                  ? Shell(key: const ValueKey('shell'), initialTab: widget.initialTab)
+                  : const AdaptiveShell(key: ValueKey('shell')),
     );
   }
 }
