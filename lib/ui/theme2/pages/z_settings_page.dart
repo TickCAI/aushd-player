@@ -9,6 +9,7 @@ import '../../../l10n/l10n.dart';
 import '../device_form.dart';
 import '../tokens.dart';
 import '../widgets/diagnostics_button.dart';
+import '../widgets/z_media.dart';
 import '../z_components.dart';
 import '../z_routes.dart';
 
@@ -150,13 +151,15 @@ class ZSettingsPage extends StatelessWidget {
     required String hint,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: ZCard(
+    return ZFocusable(
+      onSelect: onTap,
+      radius: Zr.card,
+      scale: 1.02,
+      builder: (context, focused) => ZCard(
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: Zc.brandPrimary),
+            Icon(icon, size: 20, color: focused ? Zc.brandPrimary : Zc.textSecondary),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -172,7 +175,7 @@ class ZSettingsPage extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, size: 20, color: Zc.textTertiary),
+            Icon(Icons.chevron_right_rounded, size: 20, color: focused ? Zc.brandPrimary : Zc.textTertiary),
           ],
         ),
       ),

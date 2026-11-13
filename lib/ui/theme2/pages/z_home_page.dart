@@ -141,26 +141,35 @@ class _ZHomePageState extends State<ZHomePage> {
 
   Widget _content(_HomeData data, AppServices services) {
     final catalog = services.catalog;
-    final bottomPad = DeviceFormX.of(context).usesDock ? 104.0 : 36.0;
+    final form = DeviceFormX.of(context);
+    // TV 用更大的卡片（3 米外可读），手机用更小的卡片（一屏多露一张）。
+    final posterW = form.isTv ? 188.0 : (form.isPhone ? 132.0 : _rowPosterWidth);
+    final cardW = form.isTv ? 330.0 : (form.isPhone ? 214.0 : _rowCardWidth);
+    final bottomPad = form.usesDock ? 104.0 : (form.isTv ? 40.0 : 36.0);
     return ListView(
       padding: EdgeInsets.only(top: 20, bottom: bottomPad),
       physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
       children: [
         _header(services),
         const SizedBox(height: 16),
-        if (data.hero.isNotEmpty) ZHeroCarousel(items: [for (final i in data.hero) _hero(i, catalog)]),
+        if (data.hero.isNotEmpty)
+          ZHeroCarousel(
+            items: [for (final i in data.hero) _hero(i, catalog)],
+            // 低端机 / 系统"减少动画"时关掉自动轮播，省解码与电。
+            autoplay: !MediaQuery.of(context).disableAnimations,
+          ),
         const SizedBox(height: 26),
         ZMediaRow(
           title: context.l10n.continueWatching,
-          height: _rowCardWidth * 9 / 16 + 30,
+          height: cardW * 9 / 16 + 30,
           children: [
             for (final i in data.resume)
               ZLandscapeTile(
-                image: catalog.landscape(i, width: _rowCardWidth),
+                image: catalog.landscape(i, width: cardW),
                 title: _resumeTitle(i),
                 subtitle: _remaining(i) ?? _meta(i),
                 progress: i.progress,
-                width: _rowCardWidth,
+                width: cardW,
                 onTap: () => _open(i),
               ),
           ],
@@ -168,15 +177,15 @@ class _ZHomePageState extends State<ZHomePage> {
         if (data.resume.isNotEmpty) const SizedBox(height: 26),
         ZMediaRow(
           title: context.l10n.latestMovies,
-          height: _rowPosterWidth * 1.5 + 44,
-          children: _posters(data.movies, catalog),
+          height: posterW * 1.5 + 44,
+          children: _posters(data.movies, catalog, posterW),
           onMore: data.views.isEmpty ? null : () => _openLibrary(null),
         ),
         if (data.movies.isNotEmpty) const SizedBox(height: 26),
         ZMediaRow(
           title: context.l10n.latestShows,
-          height: _rowPosterWidth * 1.5 + 44,
-          children: _posters(data.shows, catalog),
+          height: posterW * 1.5 + 44,
+          children: _posters(data.shows, catalog, posterW),
           onMore: data.views.isEmpty ? null : () => _openLibrary(null),
         ),
         if (data.shows.isNotEmpty) const SizedBox(height: 30),
@@ -263,14 +272,14 @@ class _ZHomePageState extends State<ZHomePage> {
         _ => Icons.folder_outlined,
       };
 
-  List<Widget> _posters(List<EmbyItem> items, CatalogApi catalog) => [
+  List<Widget> _posters(List<EmbyItem> items, CatalogApi catalog, double width) => [
         for (final i in items)
           ZPosterTile(
-            image: catalog.poster(i, width: _rowPosterWidth),
+            image: catalog.poster(i, width: width),
             title: i.isEpisode ? (i.seriesName ?? i.name) : i.name,
             subtitle: _meta(i),
             progress: i.progress,
-            width: _rowPosterWidth,
+            width: width,
             onTap: () => _open(i),
           ),
       ];
@@ -365,13 +374,17 @@ class _LibraryChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
+    return ZFocusable(
+      onSelect: onTap,
+      radius: Zr.card,
+      scale: 1.03,
+      builder: (context, focused) => AnimatedContainer(
+        duration: const Duration(milliseconds: 140),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: Zc.surface,
           borderRadius: BorderRadius.circular(Zr.card),
+          border: focused ? Border.all(color: Zc.brandPrimary, width: 2) : null,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,

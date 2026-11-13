@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../focus/tv_focusable.dart';
 import 'tokens.dart';
 
 /// 圆角卡片：浅色用纯白表面，深色用深色表面一级。
@@ -50,9 +51,10 @@ class ZPrimaryButton extends StatelessWidget {
       button: true,
       enabled: enabled,
       label: label,
-      child: GestureDetector(
-        onTap: enabled ? onPressed : null,
-        child: Container(
+      child: TvFocusable(
+        onSelect: enabled ? onPressed : null,
+        builder: (context, focused) => AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
           constraints: const BoxConstraints(minHeight: 44),
           alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -60,6 +62,9 @@ class ZPrimaryButton extends StatelessWidget {
             gradient: enabled ? Zbrand.gradient : null,
             color: enabled ? null : disabledColor,
             borderRadius: BorderRadius.circular(Zr.button),
+            boxShadow: focused
+                ? const [BoxShadow(color: Color(0x590CBDE6), blurRadius: 16, spreadRadius: 1)]
+                : null,
           ),
           child: Text(
             label,
@@ -121,15 +126,22 @@ class ZGhostButton extends StatelessWidget {
     return Semantics(
       button: true,
       label: label,
-      child: GestureDetector(
-        onTap: onPressed,
-        child: Container(
+      child: TvFocusable(
+        onSelect: onPressed,
+        builder: (context, focused) => AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
           constraints: const BoxConstraints(minHeight: 44),
           alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: 18),
           decoration: BoxDecoration(
+            color: focused && isLight ? Zc.subtle : null,
             borderRadius: BorderRadius.circular(Zr.button),
-            border: Border.all(color: isLight ? Zc.separator : const Color(0x33FFFFFF)),
+            border: Border.all(
+              color: focused
+                  ? Zc.brandPrimary
+                  : (isLight ? Zc.separator : const Color(0x33FFFFFF)),
+              width: focused ? 2 : 1,
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,

@@ -5,11 +5,62 @@ import 'package:flutter/material.dart';
 
 import '../tokens.dart';
 import '../z_components.dart';
+import '../../focus/tv_focusable.dart';
 import '../../widgets/net_image.dart';
+
 /// 媒体展示组件族（M2）：海报卡 / 横卡 / 横向列表 / Hero 轮播 / 空态。
 ///
 /// 全部是纯展示组件——图片 Uri 由调用方用 `catalog.poster(...)` 等扩展预解，
 /// 组件本身不依赖 `AppServicesScope`，因此可以在 widget test 里直接 pump。
+
+/// 可聚焦包装：鼠标 hover / TV D-pad 焦点都会得到放大 + 品牌色光晕。
+///
+/// 复用既有 [TvFocusable]（Enter / Select / 手柄 A 激活；方向键交给
+/// `ZoneNavigator` 做几何寻路），因此新页面天生支持遥控器。
+class ZFocusable extends StatelessWidget {
+  const ZFocusable({
+    super.key,
+    required this.builder,
+    this.onSelect,
+    this.onMenu,
+    this.autofocus = false,
+    this.radius = Zr.poster,
+    this.scale = 1.04,
+  });
+
+  final Widget Function(BuildContext context, bool focused) builder;
+  final VoidCallback? onSelect;
+  final VoidCallback? onMenu;
+  final bool autofocus;
+  final double radius;
+  final double scale;
+
+  @override
+  Widget build(BuildContext context) {
+    return TvFocusable(
+      autofocus: autofocus,
+      onSelect: onSelect,
+      onMenu: onMenu,
+      builder: (context, focused) => AnimatedScale(
+        scale: focused ? scale : 1.0,
+        duration: const Duration(milliseconds: 140),
+        curve: Curves.easeOut,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(radius),
+            boxShadow: focused
+                ? const [
+                    BoxShadow(color: Color(0x590CBDE6), blurRadius: 18, spreadRadius: 1),
+                  ]
+                : null,
+          ),
+          child: builder(context, focused),
+        ),
+      ),
+    );
+  }
+}
 
 double _clamp01(double? v) {
   if (v == null || v.isNaN) return 0;
@@ -49,10 +100,9 @@ class ZPosterTile extends StatelessWidget {
     final p = _clamp01(progress);
     return SizedBox(
       width: width,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Column(
+      child: ZFocusable(
+        onSelect: onTap,
+        builder: (context, focused) => Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -129,10 +179,9 @@ class ZLandscapeTile extends StatelessWidget {
     final p = _clamp01(progress);
     return SizedBox(
       width: width,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Column(
+      child: ZFocusable(
+        onSelect: onTap,
+        builder: (context, focused) => Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

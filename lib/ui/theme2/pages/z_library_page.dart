@@ -200,13 +200,18 @@ class _ZLibraryPageState extends State<ZLibraryPage> {
       );
     }
     final catalog = services.catalog;
-    final bottomPad = DeviceFormX.of(context).usesDock ? 104.0 : 32.0;
+    final form = DeviceFormX.of(context);
+    final bottomPad = form.usesDock ? 104.0 : (form.isTv ? 36.0 : 32.0);
+    final maxTile = form.isTv ? 250.0 : (form.isPhone ? 156.0 : 196.0);
     return ColoredBox(
       color: Zc.bgBase,
-      child: CustomScrollView(
-        controller: _scroll,
-        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-        slivers: [
+      child: RefreshIndicator(
+        color: Zc.brandPrimary,
+        onRefresh: _reload,
+        child: CustomScrollView(
+          controller: _scroll,
+          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+          slivers: [
           SliverToBoxAdapter(child: _header()),
           SliverToBoxAdapter(child: _viewChips()),
           SliverToBoxAdapter(child: _sortBar()),
@@ -233,8 +238,8 @@ class _ZLibraryPageState extends State<ZLibraryPage> {
             SliverPadding(
               padding: EdgeInsets.fromLTRB(24, 4, 24, bottomPad),
               sliver: SliverGrid.builder(
-                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: 196,
+                gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: maxTile,
                   crossAxisSpacing: 14,
                   mainAxisSpacing: 18,
                   childAspectRatio: 0.52,
@@ -266,6 +271,7 @@ class _ZLibraryPageState extends State<ZLibraryPage> {
               ),
             ),
         ],
+        ),
       ),
     );
   }
@@ -308,15 +314,19 @@ class _ZLibraryPageState extends State<ZLibraryPage> {
         itemBuilder: (context, i) {
           final v = _views[i];
           final selected = v.id == _viewId;
-          return GestureDetector(
-            onTap: () => _selectView(v.id),
-            child: Container(
+          return ZFocusable(
+            onSelect: () => _selectView(v.id),
+            radius: Zr.button,
+            scale: 1.05,
+            builder: (context, focused) => AnimatedContainer(
+              duration: const Duration(milliseconds: 140),
               alignment: Alignment.center,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
                 gradient: selected ? Zbrand.gradient : null,
                 color: selected ? null : Zc.surface,
                 borderRadius: BorderRadius.circular(Zr.button),
+                border: focused && !selected ? Border.all(color: Zc.brandPrimary, width: 2) : null,
               ),
               child: Text(
                 v.name,
@@ -336,23 +346,32 @@ class _ZLibraryPageState extends State<ZLibraryPage> {
         spacing: 8,
         children: [
           for (final s in _Sort.values)
-            GestureDetector(
-              onTap: () => _selectSort(s),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: s == _sort ? Zc.subtle : Colors.transparent,
-                  borderRadius: BorderRadius.circular(Zr.button),
-                  border: Border.all(color: s == _sort ? Zc.brandPrimary : Zc.separator),
-                ),
-                child: Text(
-                  s.label,
-                  style: Zt.micro.copyWith(
-                    color: s == _sort ? Zc.brandPrimary : Zc.textSecondary,
-                    fontWeight: FontWeight.w600,
+            ZFocusable(
+              onSelect: () => _selectSort(s),
+              radius: Zr.button,
+              scale: 1.06,
+              builder: (context, focused) {
+                final active = s == _sort;
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 140),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: active ? Zc.subtle : Colors.transparent,
+                    borderRadius: BorderRadius.circular(Zr.button),
+                    border: Border.all(
+                      color: focused || active ? Zc.brandPrimary : Zc.separator,
+                      width: focused ? 2 : 1,
+                    ),
                   ),
-                ),
-              ),
+                  child: Text(
+                    s.label,
+                    style: Zt.micro.copyWith(
+                      color: active ? Zc.brandPrimary : Zc.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                );
+              },
             ),
         ],
       ),

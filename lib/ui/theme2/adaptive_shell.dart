@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../focus/tv_focusable.dart';
 import 'device_form.dart';
 import 'orientation.dart';
 import 'tokens.dart';
@@ -57,23 +58,25 @@ class _AdaptiveShellState extends State<AdaptiveShell> {
     // 未登记的 tab 一律走 fallback，永不空页面。
     final builder = ZRoutes.page(_tab) ?? ZRoutes.fallback(_tab);
     final page = builder(context);
+    // 手机竖版：给内容留出状态栏，底部由页面自己按 dock 高度留白。
+    final safePage = form.usesDock ? SafeArea(bottom: false, child: page) : page;
     if (form.usesRail) {
       return Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [_rail(context), Expanded(child: page)],
+        children: [_rail(context), Expanded(child: safePage)],
       );
     }
     if (form.usesDock) {
       return Stack(
         children: [
-          Positioned.fill(child: page),
+          Positioned.fill(child: safePage),
           Positioned(left: 16, right: 16, bottom: 16, child: _dock()),
         ],
       );
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [_topBar(), Expanded(child: page)],
+      children: [_topBar(), Expanded(child: safePage)],
     );
   }
 
@@ -118,15 +121,17 @@ class _AdaptiveShellState extends State<AdaptiveShell> {
       button: true,
       selected: selected,
       label: t.labelZh,
-      child: GestureDetector(
-        onTap: () => _select(t),
-        child: Container(
+      child: TvFocusable(
+        onSelect: () => _select(t),
+        builder: (context, focused) => AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
           width: 44,
           height: 44,
           decoration: BoxDecoration(
             gradient: selected ? Zbrand.gradient : null,
             color: selected ? null : Zc.subtle,
             borderRadius: BorderRadius.circular(Zr.button),
+            border: focused && !selected ? Border.all(color: Zc.brandPrimary, width: 2) : null,
           ),
           alignment: Alignment.center,
           child: Icon(t.icon, size: 22, color: selected ? Colors.white : Zc.textPrimary),
@@ -152,20 +157,25 @@ class _AdaptiveShellState extends State<AdaptiveShell> {
   Widget _dockItem(ZTab t) {
     final selected = t == _tab;
     return Expanded(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => _select(t),
-        child: Column(
+      child: TvFocusable(
+        onSelect: () => _select(t),
+        builder: (context, focused) => Column(
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 140),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
               decoration: BoxDecoration(
                 gradient: selected ? Zbrand.gradient : null,
+                color: focused && !selected ? Zc.subtle : null,
                 borderRadius: BorderRadius.circular(Zr.button),
               ),
-              child: Icon(t.icon, size: 20, color: selected ? Colors.white : Zc.textSecondary),
+              child: Icon(
+                t.icon,
+                size: 20,
+                color: selected ? Colors.white : (focused ? Zc.brandPrimary : Zc.textSecondary),
+              ),
             ),
             const SizedBox(height: 2),
             Text(
@@ -195,29 +205,34 @@ class _AdaptiveShellState extends State<AdaptiveShell> {
     final selected = t == _tab;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Transform.scale(
-        scale: selected ? 1.12 : 1.0,
-        child: GestureDetector(
-          onTap: () => _select(t),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-            decoration: BoxDecoration(
-              gradient: selected ? Zbrand.gradient : null,
-              color: selected ? null : Zc.subtle,
-              borderRadius: BorderRadius.circular(Zr.button),
-              border: selected ? Border.all(color: Zc.brandPrimary, width: 2) : null,
+      child: TvFocusable(
+        autofocus: selected,
+        onSelect: () => _select(t),
+        builder: (context, focused) {
+          final active = selected || focused;
+          return Transform.scale(
+            scale: selected ? 1.12 : (focused ? 1.06 : 1.0),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 140),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+              decoration: BoxDecoration(
+                gradient: selected ? Zbrand.gradient : null,
+                color: selected ? null : Zc.subtle,
+                borderRadius: BorderRadius.circular(Zr.button),
+                border: active ? Border.all(color: Zc.brandPrimary, width: 2) : null,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(t.icon, size: 20, color: selected ? Colors.white : Zc.textPrimary),
+                  const SizedBox(width: 6),
+                  Text(t.labelZh,
+                      style: Zt.caption.copyWith(color: selected ? Colors.white : Zc.textPrimary)),
+                ],
+              ),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(t.icon, size: 20, color: selected ? Colors.white : Zc.textPrimary),
-                const SizedBox(width: 6),
-                Text(t.labelZh,
-                    style: Zt.caption.copyWith(color: selected ? Colors.white : Zc.textPrimary)),
-              ],
-            ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
