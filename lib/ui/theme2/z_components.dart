@@ -72,8 +72,7 @@ class ZPrimaryButton extends StatelessWidget {
 }
 
 /// 圆角胶囊小标签（micro 字阶），默认用品牌色，可用 color 覆盖。
-class ZBadge extends StatelessWidget {
-  const ZBadge({
+class ZBadge extends StatelessWidget {  const ZBadge({
     super.key,
     required this.text,
     this.color,
@@ -95,6 +94,54 @@ class ZBadge extends StatelessWidget {
       child: Text(
         text,
         style: Zt.micro.copyWith(color: Colors.white),
+      ),
+    );
+  }
+}
+
+/// 次级胶囊按钮：描边 + 文本色，用于"详情""更多"这类非主行动。
+class ZGhostButton extends StatelessWidget {
+  const ZGhostButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+    this.icon,
+    this.tint,
+  });
+
+  final String label;
+  final VoidCallback onPressed;
+  final IconData? icon;
+  final Color? tint;
+
+  @override
+  Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final color = tint ?? (isLight ? Zc.textPrimary : Zc.darkTextPrimary);
+    return Semantics(
+      button: true,
+      label: label,
+      child: GestureDetector(
+        onTap: onPressed,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 44),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(Zr.button),
+            border: Border.all(color: isLight ? Zc.separator : const Color(0x33FFFFFF)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 18, color: color),
+                const SizedBox(width: 6),
+              ],
+              Text(label, style: Zt.headline.copyWith(color: color)),
+            ],
+          ),
+        ),
       ),
     );
   }

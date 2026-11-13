@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../core/host.dart';
+import '../../core/host.dart';
 
 /// The three form factors AusHD 2.0 ships as one design language.
 ///

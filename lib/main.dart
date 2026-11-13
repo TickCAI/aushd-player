@@ -31,7 +31,6 @@ import 'ui/player/navigator_osd_presenter.dart';
 import 'ui/shell/shell.dart';
 import 'ui/theme/tokens.dart';
 import 'ui/theme2/adaptive_shell.dart';
-import 'ui/theme2/device_form.dart';
 
 Future<void> main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();

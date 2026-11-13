@@ -1,16 +1,15 @@
-import 'package:flutter/foundation.dart' show TargetPlatform, debugDefaultTargetPlatformOverride;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zerk_play/l10n/l10n.dart';
 import 'package:zerk_play/ui/theme2/adaptive_shell.dart';
 import 'package:zerk_play/ui/theme2/tokens.dart';
 import 'package:zerk_play/ui/theme2/z_routes.dart';
 
 void main() {
-  // flutter_test 默认即 android；显式钉死，保证 DeviceFormX.of 的桌面/手机
-  // 判定只由 MediaQuery 尺寸决定，不随 CI 平台漂移（TV 态需要 isAndroid +
-  // landscape + shortest>=900，无法在本测试里同时稳定模拟，故只测两态）。
-  setUp(() => debugDefaultTargetPlatformOverride = TargetPlatform.android);
-  tearDown(() => debugDefaultTargetPlatformOverride = null);
+  // 不覆盖 debugDefaultTargetPlatformOverride：flutter_test 在 FLUTTER_TEST
+  // 下 defaultTargetPlatform 已经是 android，而显式设置它会在 postTest 的
+  // 不变量校验里报 "foundation debug variable was changed by the test"。
+  // TV 态需要 isAndroid + landscape + shortest>=900，本测试只覆盖桌面 / 手机两态。
 
   testWidgets('桌面 1200x800：左侧 rail 存在，点击 tab 无异常', (tester) async {
     await _pumpShell(tester, const Size(1200, 800));
@@ -52,6 +51,9 @@ Future<void> _pumpShell(WidgetTester tester, Size size) async {
   await tester.pumpWidget(
     MaterialApp(
       theme: ZTheme.light(),
+      // M2 的真实页面用 context.l10n 取文案，测试里必须带齐 delegate。
+      localizationsDelegates: L10n.localizationsDelegates,
+      supportedLocales: L10n.supportedLocales,
       home: MediaQuery(
         data: MediaQueryData(size: size),
         child: const AdaptiveShell(),

@@ -11,6 +11,7 @@ import 'pages/z_home_page.dart';
 import 'pages/z_library_page.dart';
 import 'pages/z_search_page.dart';
 import 'pages/z_settings_page.dart';
+import 'tokens.dart';
 
 /// 新壳的五个顶层 tab。
 ///
@@ -70,3 +71,13 @@ abstract final class ZRoutes {
         ZTab.more => const Shell(initialTab: ShellTab.home),
       };
 }
+
+/// 新页之间的跳转路由：显式包一层浅色主题。
+///
+/// Navigator 在 `MaterialApp` 之下、`AdaptiveShell` 之上，因此 push 进来的
+/// 页面拿到的是旧 `buildTheme()`（深色）。新页用的是硬编码浅色令牌，
+/// 不包这一层就会出现"深底深字"。
+Route<void> zRoute(Widget page, {String? name}) => MaterialPageRoute<void>(
+      settings: RouteSettings(name: name),
+      builder: (_) => Theme(data: ZTheme.light(), child: page),
+    );

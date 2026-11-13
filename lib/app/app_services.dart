@@ -376,4 +376,9 @@ final class AppServicesScope extends InheritedNotifier<AppServices> {
 
   static AppServices read(BuildContext context) =>
       context.getInheritedWidgetOfExactType<AppServicesScope>()!.notifier!;
+
+  /// 可空版本：新界面（theme2）在 widget test / 无服务环境下也要能渲染空态，
+  /// 拿不到服务时返回 null 而不是抛异常。
+  static AppServices? maybeRead(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<AppServicesScope>()?.notifier;
 }
