@@ -263,6 +263,20 @@ micro      11 / w600   徽章（HDR/4K/字幕）
 
 > 每阶段结束可构建可用的过渡版本，不憋大招。**重写分支产物从 v0.1 测试版起计**（不走 v1.9/v2.0.0 命名），测试包走独立渠道不推自动更新，稳定后再议正式版本号；保留 v1.0.1 回退安装路径。4 周观察期：无留存/迁移变化则 M3/M4 降级维护模式止损。
 
+### 5.1 实施进度（截至 2026-11-13）
+
+| 阶段 | 状态 | 实况 |
+|---|---|---|
+| M0 测试网 | ✅ 完成 | `quality.yml` 三作业；首轮 CI 全绿。golden 基线仍未接（本地 SDK 已于本轮装好，可作下一项） |
+| M0.5 播放路由解耦 | ✅ 完成 | `OsdPresenter` 接口 + `NavigatorOsdPresenter`；3 处残留 ui import 仍在（gamepad / net_image / tv_scale，属纯工具类，纳入 M5 清理） |
+| M1 设计系统 | ✅ 完成 | tokens / `ZCard` / `ZPrimaryButton` / `ZGhostButton` / `ZBadge` / `DeviceForm` / `ZOrientation` / `AdaptiveShell` / `ZRoutes` 回落 |
+| M2 桌面端全页 | ⚠️ 部分完成 | P01 首页、P02 媒体库、P05 搜索、P06 设置已完成；P03 详情页仍走经典实现（已包深色主题）；P04 播放器 OSD、P07 直播/Together、P08 引导仍为经典 |
+| M3 手机端 | ✅ 骨架完成 | 悬浮 Dock、SafeArea、小尺寸卡片；播放器触控 OSD 沿用旧实现 |
+| M4 TV 端 | ✅ 骨架完成 | 全部新页控件接入 `TvFocusable`（方向键寻路 + Enter/Select/手柄 A），TV 尺寸卡片，顶部胶囊横栏；低端机降级目前只覆盖「减少动画时关轮播自动播放」 |
+| M5 回归发布 | 🔄 进行中 | v0.1 测试版三平台发版走 `test_release` 手动触发 |
+
+> 关键回归经验：M1 曾因 `device_form.dart` 的 `import '../core/host.dart'`（少一级，指向 `lib/ui/core/`）同时挂掉 `flutter test` 与 `flutter build apk`；`flutter analyze` 是 advisory 作业（`continue-on-error`），**不能当作编译通过的证据**。本轮已在本地装 Flutter 3.50 做前置验证，后续提交先本地 `flutter analyze` + `flutter test` 再推。
+
 ---
 
 ## 六、风险与对策
