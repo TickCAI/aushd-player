@@ -29,7 +29,10 @@ abstract final class LogUpload {
     final files = Directory(dir)
         .listSync()
         .whereType<File>()
-        .where((f) => p.basename(f.path).startsWith('zerkplay-'))
+        .where((f) {
+          final name = p.basename(f.path);
+          return name.startsWith('aushd-') || name.startsWith('zerkplay-');
+        })
         .toList()
       ..sort((a, b) => b.path.compareTo(a.path));
     final parts = <String>[];
@@ -49,7 +52,7 @@ abstract final class LogUpload {
             body: jsonEncode({
               'device': {
                 'platform': Host.isAndroid ? 'androidtv' : Host.isLinux ? 'linux' : 'windows',
-                'version': '${Release.name} (${AppLog.appVersion})',
+                'version': Release.name,
               },
               'note': ?note,
               'text': parts.join('\n\n'),

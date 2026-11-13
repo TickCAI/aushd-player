@@ -5,6 +5,7 @@ import '../../app/app_services.dart';
 import '../../app/app_settings.dart';
 import '../../core/emby/models/emby_item.dart';
 import '../../data/catalog_api.dart' show CatalogApi;
+import '../../data/catalog_api.dart' as catalog show LibraryView;
 import '../../data/collection_index.dart';
 import '../../l10n/l10n.dart';
 import '../core/artwork.dart';
@@ -63,25 +64,71 @@ class _LibraryPageState extends State<LibraryPage> {
   String? _genre;
   List<String> _genres = const [];
 
+  /// Real libraries reported by the Emby/Jellyfin server, not the app's
+  /// hard-coded "Movies / Shows / Favorites" taxonomy.
+  List<catalog.LibraryView> _views = const [];
+  String? _viewId;
+
+  catalog.LibraryView? get _view {
+    if (_viewId == null) return null;
+    for (final v in _views) {
+      if (v.id == _viewId) return v;
+    }
+    return null;
+  }
+
   final _items = <EmbyItem>[];
   int _total = -1;
   bool _loading = false;
   int _generation = 0;
   final _grid = RevealController(margin: 120);
 
-  List<String> get _types => switch (widget.kind) {
-        LibraryKind.movies => const ['Movie'],
-        LibraryKind.shows => const ['Series'],
-        LibraryKind.favorites => const ['Movie', 'Series'],
-      };
+  List<String> get _types {
+    // A server library has its own content type. Browsing a "TV Shows"
+    // library must show series even when the Movies tab is selected.
+    final type = _view?.collectionType;
+    if (type == 'movies' || type == 'boxsets') return const ['Movie'];
+    if (type == 'tvshows') return const ['Series'];
+    return switch (widget.kind) {
+      LibraryKind.movies => const ['Movie'],
+      LibraryKind.shows => const ['Series'],
+      LibraryKind.favorites => const ['Movie', 'Series'],
+    };
+  }
 
   @override
   void initState() {
     super.initState();
     _reload();
-    AppServicesScope.read(context).catalog.genres(types: _types).then((g) {
+    _loadGenres();
+    _loadViews();
+  }
+
+  void _loadGenres() {
+    AppServicesScope.read(context)
+        .catalog
+        .genres(types: _types, parentId: _viewId)
+        .then((g) {
       if (mounted) setState(() => _genres = g);
     }).catchError((_) {});
+  }
+
+  Future<void> _loadViews() async {
+    try {
+      final views = await AppServicesScope.read(context).catalog.views();
+      if (!mounted) return;
+      setState(() => _views = [for (final v in views) if (v.name.isNotEmpty) v]);
+    } catch (e) {
+      debugPrint('[library] views: $e');
+    }
+  }
+
+  void _selectView(String? id) {
+    if (id == _viewId) return;
+    _viewId = id;
+    _genre = null;
+    _loadGenres();
+    _reload();
   }
 
   @override
@@ -108,6 +155,7 @@ class _LibraryPageState extends State<LibraryPage> {
     if (_grouped(settings)) return _loadGrouped(generation);
     try {
       final page = await AppServicesScope.read(context).catalog.query(
+            parentId: _viewId,
             collapseBoxSets: _grouped(settings),
             types: _types,
             sortBy: _sort.field,
@@ -147,6 +195,7 @@ class _LibraryPageState extends State<LibraryPage> {
   Future<void> _loadGrouped(int generation) async {
     try {
       final page = await AppServicesScope.read(context).catalog.query(
+            parentId: _viewId,
             types: _types,
             sortBy: 'SortName',
             limit: 5000,
@@ -221,7 +270,8 @@ class _LibraryPageState extends State<LibraryPage> {
   }
 
   bool _grouped(AppSettings settings) =>
-      widget.kind == LibraryKind.movies && settings.groupCollections && _genre == null && _watched == _Watched.all;
+      widget.kind == LibraryKind.movies && settings.groupCollections && _types.contains('Movie') &&
+      _genre == null && _watched == _Watched.all;
 
   Future<void> _toggleGrouping(AppServices services) async {
     await services.updateSettings(services.settings.copyWith(groupCollections: !services.settings.groupCollections));
@@ -287,11 +337,17 @@ class _LibraryPageState extends State<LibraryPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final title = switch (widget.kind) {
-      LibraryKind.movies => l10n.movies,
-      LibraryKind.shows => l10n.shows,
-      LibraryKind.favorites => l10n.favorites,
-    };
+    final selectedView = _view;
+    final String title;
+    if (selectedView != null) {
+      title = selectedView.name;
+    } else {
+      title = switch (widget.kind) {
+        LibraryKind.movies => l10n.movies,
+        LibraryKind.shows => l10n.shows,
+        LibraryKind.favorites => l10n.favorites,
+      };
+    }
     final services = AppServicesScope.of(context);
     final view = services.settings.libraryView;
     final columns = switch (view) {
@@ -361,6 +417,23 @@ class _LibraryPageState extends State<LibraryPage> {
           ),
         ]),
       ),
+      if (_views.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(left: contentLeft, right: 120, bottom: 18),
+          child: FocusZone(
+            debugLabel: 'library-views',
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(children: [
+                TvButton(label: l10n.filterAll, primary: _viewId == null, onSelect: () => _selectView(null)),
+                for (final v in _views) ...[
+                  const SizedBox(width: 12),
+                  TvButton(label: v.name, primary: _viewId == v.id, onSelect: () => _selectView(v.id)),
+                ],
+              ]),
+            ),
+          ),
+        ),
       Expanded(
         child: _total == 0
             ? Padding(

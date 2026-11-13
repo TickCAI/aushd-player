@@ -99,10 +99,12 @@ class HeroPanel extends StatelessWidget {
       ),
       child: i == null
           ? const SizedBox.shrink()
-          : SizedBox(
+          : ConstrainedBox(
               key: ValueKey(i.key),
-              width: 980,
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+              constraints: const BoxConstraints(maxWidth: 980),
+              child: SizedBox(
+                width: double.infinity,
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
                 if (i.request != null) ...[
                   i.media != null
                       ? RequestStateBuilder(media: i.media!, builder: (_, a, r) => _RequestBanner(a, release: r))
@@ -137,7 +139,8 @@ class HeroPanel extends StatelessWidget {
                   const SizedBox(height: 18),
                   Text(i.overview!, maxLines: 3, overflow: TextOverflow.ellipsis, style: Zt.body),
                 ],
-              ]),
+                ]),
+              ),
             ),
     );
   }

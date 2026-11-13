@@ -58,9 +58,36 @@ jobs:
         run: |
           echo "Build-only mode - AUSHD_DIST_URL and AUSHD_HUB_URL are empty; updater and hub stay disabled."
 
+  quality:
+    name: Tests and compile gate
+    needs: preflight
+    runs-on: ubuntu-latest
+    env:
+      # flutter_tester talks to itself over a local WebSocket; a proxy would
+      # break the upgrade handshake.
+      NO_PROXY: 127.0.0.1,localhost
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Generate localizations
+        run: flutter gen-l10n
+
+      # Includes test/compile_all_test.dart, which compiles the entire app
+      # graph. `flutter analyze` alone cannot prove the app builds.
+      - name: Unit tests and whole-app compile gate
+        run: flutter test
+
   build:
     name: Build ${{ matrix.platform }}
-    needs: preflight
+    needs: [preflight, quality]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -174,6 +201,22 @@ jobs:
           mkdir -p dist
           cp build/linux/package/*.tar.gz "dist/AusHD-Player-${V}-Linux-x64.tar.gz"
           ls -lh dist
+
+      - name: Verify Linux package can actually decode
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          pkg=$(echo dist/*.tar.gz)
+          tar -tzf "$pkg" | grep -q 'libmpv.so.2' || {
+            echo "::error::libmpv.so.2 is missing: the package would install but never play a video."
+            exit 1
+          }
+          tar -tzf "$pkg" | grep -q '/aushd-player$' || {
+            echo "::error::launcher missing from Linux package."
+            exit 1
+          }
+          echo "Linux package contains the decoder and launcher."
 
       # ---------------- Android TV ----------------
       - uses: actions/setup-java@v4

@@ -24,14 +24,16 @@ final class LogSink {
     _prune(dir);
     final now = DateTime.now();
     String two(int v) => v.toString().padLeft(2, '0');
-    final name = 'zerkplay-${now.year}${two(now.month)}${two(now.day)}-${two(now.hour)}${two(now.minute)}${two(now.second)}.log';
+    final name = 'aushd-${now.year}${two(now.month)}${two(now.day)}-${two(now.hour)}${two(now.minute)}${two(now.second)}.log';
     final path = p.join(dir.path, name);
     return LogSink._(dir.path, path, File(path).openWrite(mode: FileMode.append));
   }
 
   static void _prune(Directory dir) {
     try {
-      for (final prefix in const ['zerkplay-', 'mpv-']) {
+      // 'zerkplay-' and 'mpv-' are kept in the prune list so logs written by
+      // older builds are still rotated after an in-place upgrade.
+      for (final prefix in const ['aushd-', 'zerkplay-', 'mpv-']) {
         final files = dir.listSync().whereType<File>().where((f) => p.basename(f.path).startsWith(prefix)).toList()
           ..sort((a, b) => b.path.compareTo(a.path));
         for (final f in files.skip(_keep)) {

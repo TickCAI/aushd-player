@@ -577,7 +577,7 @@
   "detailedLog": "详细播放日志",
   "detailedLogHint": "mpv 会在应用日志旁写一份每次播放的完整日志",
   "openLogsFolder": "打开日志目录",
-  "appVersionLabel": "AusHD Player {version}",
+  "appVersionLabel": "{version}",
   "profile": "个人资料",
   "tags": "标签",
   "becauseYouLikeTag": "因为你喜欢：{tag}",

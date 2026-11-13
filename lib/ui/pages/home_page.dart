@@ -12,6 +12,7 @@ import '../../data/title_tags.dart';
 import '../../core/log/app_log.dart';
 import '../../l10n/l10n.dart';
 import '../core/artwork.dart';
+import '../core/input_mode.dart';
 import '../core/playback_launcher.dart';
 import '../focus/focus_zone.dart';
 import '../theme/tokens.dart';
@@ -19,7 +20,6 @@ import '../widgets/backdrop.dart';
 import '../widgets/cards.dart';
 import '../widgets/cinema_loader.dart';
 import '../widgets/media_row.dart';
-import '../widgets/rows_scroll_view.dart';
 import '../widgets/mixed_cards.dart';
 import '../widgets/mood_shelf.dart';
 import '../widgets/trailer.dart';
@@ -70,6 +70,18 @@ class _HomePageState extends State<HomePage> {
   final _resolved = <_Row, MixedItems>{};
   bool _heroSet = false;
 
+  /// Auto-rotating hero candidates. Only entries with a reachable backdrop
+  /// enter the pool, so the carousel never fades to an empty frame.
+  final _heroPool = <HeroInfo>[];
+  static const _heroPoolLimit = 8;
+  static const _heroDwell = Duration(seconds: 7);
+  static const _heroPinTime = Duration(seconds: 12);
+  int _heroIndex = 0;
+  Timer? _carousel;
+  Timer? _heroUnpin;
+  bool _heroPinned = false;
+  bool _animationsEnabled = true;
+
   bool _loaded = false;
   bool _showLoader = false;
 
@@ -114,6 +126,9 @@ class _HomePageState extends State<HomePage> {
       _rows = _buildRows(_services!);
       _data.clear();
       _resolved.clear();
+      _heroPool.clear();
+      _heroSet = false;
+      _heroIndex = 0;
       _allowFirstRows();
     });
     WidgetsBinding.instance.addPostFrameCallback((_) => _pump());
@@ -185,6 +200,8 @@ class _HomePageState extends State<HomePage> {
     _services?.libraryChanged.removeListener(refresh);
     _services?.profiles.removeListener(_onProfile);
     _services?.removeListener(_onServices);
+    _carousel?.cancel();
+    _heroUnpin?.cancel();
     _hero.dispose();
     _scroll.removeListener(_onScroll);
     _scroll.dispose();
@@ -196,6 +213,9 @@ class _HomePageState extends State<HomePage> {
       _data.clear();
       _taste = null;
       _tasteTags = null;
+      _heroPool.clear();
+      _heroSet = false;
+      _heroIndex = 0;
       _allowFirstRows();
     });
     WidgetsBinding.instance.addPostFrameCallback((_) => _pump());
@@ -413,11 +433,15 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<MixedItems> _load(_Row row, {bool counted = false}) => _data.putIfAbsent(row, () async {
+        // Capture everything that needs a BuildContext before the first await.
+        final l10n = context.l10n;
+        final services = AppServicesScope.read(context);
         if (!counted) _loading++;
         try {
           var items = await row.load();
           if (row.recommends) items = [for (final i in items) if (i.keptInRecommendations) i];
           _resolved[row] = items;
+          _collectHero(items, l10n, services);
           return items;
         } finally {
           _loading--;
@@ -425,13 +449,77 @@ class _HomePageState extends State<HomePage> {
         }
       });
 
+  static HeroInfo? _infoFor(Object data, L10n l10n, AppServices services) {
+    if (data is EmbyItem) return HeroInfo.fromItem(l10n, services, data);
+    if (data is SeerrMedia) return HeroInfo.fromRequest(l10n, data);
+    return null;
+  }
+
+  /// Feed resolved rows into the carousel pool. An entry without a backdrop
+  /// is skipped so an unreachable TMDB CDN can never produce a blank hero.
+  void _collectHero(MixedItems items, L10n l10n, AppServices services) {
+    if (_heroPool.length >= _heroPoolLimit) return;
+    final keys = {for (final h in _heroPool) h.key};
+    for (final data in items) {
+      if (_heroPool.length >= _heroPoolLimit) break;
+      final info = _infoFor(data, l10n, services);
+      if (info == null || info.backdrop == null || !keys.add(info.key)) continue;
+      _heroPool.add(info);
+    }
+    if (!_heroSet && _heroPool.isNotEmpty) {
+      _heroSet = true;
+      _heroIndex = 0;
+      _hero.set(_heroPool.first, immediate: true);
+    }
+    _syncCarousel();
+  }
+
+  void _syncCarousel() {
+    final want = _animationsEnabled && mounted && _heroPool.length >= 2;
+    if (want == (_carousel != null)) return;
+    _carousel?.cancel();
+    _carousel = want ? Timer.periodic(_heroDwell, (_) => _advanceHero()) : null;
+  }
+
+  void _advanceHero() {
+    if (!mounted || _heroPinned || _heroPool.length < 2) return;
+    _heroIndex = (_heroIndex + 1) % _heroPool.length;
+    _hero.set(_heroPool[_heroIndex]);
+  }
+
+  /// A focused card owns the hero for a while: silently rotating the backdrop
+  /// while someone is reading a row with a remote is disorienting.
+  void _pinHero() {
+    _heroPinned = true;
+    _heroUnpin?.cancel();
+    _heroUnpin = Timer(_heroPinTime, () {
+      if (!mounted) return;
+      _heroPinned = false;
+    });
+  }
+
+  void _focusHeroInfo(HeroInfo info) {
+    _pinHero();
+    for (var i = 0; i < _heroPool.length; i++) {
+      if (_heroPool[i].key == info.key) {
+        _heroIndex = i;
+        break;
+      }
+    }
+    _hero.set(info);
+  }
+
   void _focusData(Object data, {bool immediate = false}) {
-    final l10n = context.l10n;
-    _hero.set(
-        data is EmbyItem
-            ? HeroInfo.fromItem(l10n, AppServicesScope.read(context), data)
-            : HeroInfo.fromRequest(l10n, data as SeerrMedia),
-        immediate: immediate);
+    final info = _infoFor(data, context.l10n, AppServicesScope.read(context));
+    if (info == null) return;
+    _pinHero();
+    for (var i = 0; i < _heroPool.length; i++) {
+      if (_heroPool[i].key == info.key) {
+        _heroIndex = i;
+        break;
+      }
+    }
+    _hero.set(info, immediate: immediate);
   }
 
   Future<void> _play(EmbyItem item) => playItem(context, item);
@@ -439,50 +527,82 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final rows = _rows!;
-    final height = MediaQuery.sizeOf(context).height;
-    final heroHeight = height * 0.46;
+    final size = MediaQuery.sizeOf(context);
+    final height = size.height;
+    final heroHeight = (height * 0.42).clamp(260.0, 520.0);
+    // Keep the text clear of the artwork on narrow windows instead of the old
+    // hard-coded right: 600, which swallowed the whole panel on small screens.
+    final rightInset = (size.width * 0.42).clamp(140.0, 600.0);
+    final animations = !MediaQuery.of(context).disableAnimations;
+    if (animations != _animationsEnabled) {
+      _animationsEnabled = animations;
+      _syncCarousel();
+    }
+
     return Stack(children: [
+      const Positioned.fill(child: ColoredBox(color: Zc.background)),
+      // The backdrop parallax-scrolls more slowly than the page and fades out
+      // once the first rows have covered it.
       Positioned.fill(
-        child: ValueListenableBuilder(
-          valueListenable: _hero,
-          builder: (_, info, _) => Backdrop(url: info?.backdrop),
-        ),
-      ),
-      Positioned(
-        left: contentLeft,
-        top: 0,
-        height: heroHeight,
-        right: 600,
-        child: Align(
-          alignment: Alignment.bottomLeft,
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 28),
-            child: ValueListenableBuilder(valueListenable: _hero, builder: (_, info, _) => HeroPanel(info: info)),
+        child: AnimatedBuilder(
+          animation: _scroll,
+          builder: (context, child) {
+            final offset = _scroll.hasClients ? _scroll.offset.clamp(0.0, heroHeight) : 0.0;
+            final t = (offset / heroHeight).clamp(0.0, 1.0);
+            return Transform.translate(
+              offset: Offset(0, -offset * 0.35),
+              child: Opacity(opacity: 1 - t * 0.92, child: child),
+            );
+          },
+          child: RepaintBoundary(
+            child: ValueListenableBuilder<HeroInfo?>(
+              valueListenable: _hero,
+              builder: (_, info, _) => Backdrop(url: info?.backdrop),
+            ),
           ),
         ),
       ),
+      // Hero and rows share ONE scroll view, so scrolling really does move the
+      // hero off screen. Previously only the lower half of the window scrolled
+      // while the hero stayed pinned on top.
       Positioned.fill(
-        top: heroHeight,
         child: CardTrailers(
-          child: RowsScrollView(
+          child: SingleChildScrollView(
             controller: _scroll,
-            top: 24,
-            children: [for (final (i, row) in rows.indexed) _buildRow(row, first: i == 0)],
-          ),
-        ),
-      ),
-      Positioned(
-        left: 0,
-        right: 0,
-        top: heroHeight,
-        height: height * 0.035,
-        child: const IgnorePointer(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xF00B0B12), Color(0x000B0B12)],
+            child: ValueListenableBuilder<bool>(
+              valueListenable: InputMode.pointer,
+              builder: (context, pointer, _) => Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  AnimatedBuilder(
+                    animation: _scroll,
+                    builder: (context, child) {
+                      final offset = _scroll.hasClients ? _scroll.offset.clamp(0.0, heroHeight) : 0.0;
+                      final t = (offset / heroHeight).clamp(0.0, 1.0);
+                      return Opacity(opacity: 1 - t, child: child);
+                    },
+                    child: SizedBox(
+                      height: heroHeight,
+                      child: Align(
+                        alignment: Alignment.bottomLeft,
+                        child: Padding(
+                          padding: EdgeInsets.only(left: contentLeft, right: rightInset, bottom: 28),
+                          child: ValueListenableBuilder<HeroInfo?>(
+                            valueListenable: _hero,
+                            builder: (_, info, _) => info == null ? const _HeroSkeleton() : HeroPanel(info: info),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.only(top: 24, bottom: pointer ? 60 : height * 0.5),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [for (final (i, row) in rows.indexed) _buildRow(row, first: i == 0)],
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -511,7 +631,7 @@ class _HomePageState extends State<HomePage> {
       if (!_allowed.contains(row)) return const SizedBox.shrink();
       return MoodShelf(
         favoriteGenres: _profile(AppServicesScope.read(context)).then((t) => [for (final g in t.genres) g.genre]),
-        onFocusHero: (info) => _hero.set(info),
+        onFocusHero: _focusHeroInfo,
       );
     }
     return FutureBuilder<MixedItems>(
@@ -532,14 +652,6 @@ class _HomePageState extends State<HomePage> {
         final items = snap.data ?? const [];
         if (snap.hasError) debugPrint('[home] ${row.title(context.l10n)}: ${snap.error}');
         if (items.isEmpty) return const SizedBox.shrink();
-
-        if (!_heroSet) {
-          _heroSet = true;
-          final firstItem = items.first;
-          scheduleMicrotask(() {
-            if (mounted) _focusData(firstItem, immediate: true);
-          });
-        }
 
         return Padding(
           padding: const EdgeInsets.only(bottom: Zs.rowGap),
@@ -600,5 +712,32 @@ class _HomePageState extends State<HomePage> {
       );
     }
     return mixedCard(context, data, style: row.style, rank: rank, autofocus: autofocus, onFocus: () => _focusData(data));
+  }
+}
+
+/// Shown until the first row resolves a usable backdrop, so the top of the
+/// page never reads as an empty black rectangle while the library loads.
+class _HeroSkeleton extends StatelessWidget {
+  const _HeroSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    Widget bar(double w, double h) => Container(
+          width: w,
+          height: h,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(6),
+          ),
+        );
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+      bar(340, 46),
+      const SizedBox(height: 18),
+      bar(240, 16),
+      const SizedBox(height: 12),
+      bar(420, 14),
+      const SizedBox(height: 10),
+      bar(360, 14),
+    ]);
   }
 }

@@ -4,11 +4,14 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 
+import '../../app/release.dart';
 import '../host.dart';
 import 'log_sink.dart';
 
 abstract final class AppLog {
-  static const appVersion = '2.0.8+21';
+  /// Single source of truth: the Emby auth header and the log header must
+  /// report the same version as Settings does.
+  static const appVersion = Release.version;
 
   static LogSink? _sink;
   static DebugPrintCallback? _console;

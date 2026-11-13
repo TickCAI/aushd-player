@@ -36,7 +36,15 @@ final class TmdbApi {
   final String apiKey;
   final http.Client _http;
 
-  static final _base = Uri.parse('https://api.themoviedb.org/3');
+  /// Both hosts are official TMDB API endpoints. `api.themoviedb.org` is
+  /// frequently DNS-poisoned on domestic networks (it resolves to unrelated
+  /// addresses and every request then burns the full timeout), while
+  /// `api.tmdb.org` resolves cleanly. Try the clean host first and fall back
+  /// to the legacy one so neither host being blocked kills metadata.
+  static final _hosts = <Uri>[
+    Uri.parse('https://api.tmdb.org/3'),
+    Uri.parse('https://api.themoviedb.org/3'),
+  ];
 
   bool get _isToken => apiKey.startsWith('eyJ');
 
@@ -55,18 +63,32 @@ final class TmdbApi {
   }
 
   Future<Map<String, dynamic>?> get(String path, {String? language, Map<String, String> query = const {}}) async {
-    final uri = _base.replace(path: '${_base.path}$path', queryParameters: {
+    final params = {
       if (!_isToken) 'api_key': apiKey,
       'language': ?language,
       ...query,
-    });
-    final res = await _http.get(uri, headers: {
+    };
+    final headers = {
       'Accept': 'application/json',
       if (_isToken) 'Authorization': 'Bearer $apiKey',
-    }).timeout(const Duration(seconds: 10));
-    if (res.statusCode == 404) return null;
-    if (res.statusCode >= 300) throw TmdbException(res.statusCode, _message(res.body));
-    return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    };
+    Object? lastError;
+    for (final base in _hosts) {
+      final uri = base.replace(path: '${base.path}$path', queryParameters: params);
+      try {
+        final res = await _http.get(uri, headers: headers).timeout(const Duration(seconds: 6));
+        if (res.statusCode == 404) return null;
+        if (res.statusCode >= 300) throw TmdbException(res.statusCode, _message(res.body));
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      } on TmdbException {
+        // A genuine API answer (bad key, rate limit, server error). Changing
+        // hosts cannot fix it, and retrying would double the wait.
+        rethrow;
+      } catch (e) {
+        lastError = e;
+      }
+    }
+    throw lastError ?? const TmdbException(-1, 'TMDB unreachable');
   }
 
   Future<List<Map<String, dynamic>>> discover(

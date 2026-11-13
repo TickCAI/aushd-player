@@ -729,7 +729,7 @@ class _SettingsPageState extends State<SettingsPage> {
           const SizedBox(height: 20),
           Text(l10n.appVersionLabel(Release.name), style: Zt.title),
           const SizedBox(height: 8),
-          Text(AppLog.appVersion, style: Zt.caption),
+          Text('${Release.tag} · ${Release.channel}', style: Zt.caption),
           if (AppLog.file != null) ...[
             const SizedBox(height: 8),
             Text(AppLog.file!, style: Zt.caption),
