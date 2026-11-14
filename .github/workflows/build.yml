@@ -207,16 +207,39 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          pkg=$(echo dist/*.tar.gz)
-          tar -tzf "$pkg" | grep -q 'libmpv.so.2' || {
+          shopt -s nullglob
+          packages=(dist/*.tar.gz)
+          if (( ${#packages[@]} != 1 )); then
+            echo "::error::expected exactly one Linux package, found ${#packages[@]}"
+            exit 1
+          fi
+          pkg="${packages[0]}"
+          # Materialize the listing first. Piping `tar -tzf` straight into
+          # `grep -q` closes the pipe as soon as the first match is found, so
+          # tar dies with "stdout: write error" and pipefail turns a healthy
+          # package into a false "decoder missing" failure.
+          listing="$(mktemp)"
+          tar -tzf "$pkg" > "$listing"
+          grep -q 'libmpv\.so\.2' "$listing" || {
             echo "::error::libmpv.so.2 is missing: the package would install but never play a video."
             exit 1
           }
-          tar -tzf "$pkg" | grep -q '/aushd-player$' || {
+          grep -q '/aushd-player$' "$listing" || {
             echo "::error::launcher missing from Linux package."
             exit 1
           }
-          echo "Linux package contains the decoder and launcher."
+          launcher="$(tar -xOf "$pkg" aushd-player/aushd-player)"
+          grep -q 'LD_LIBRARY_PATH' <<<"$launcher" || {
+            echo "::error::launcher does not point dlopen at the vendored libraries."
+            exit 1
+          }
+          grep -q 'zerk_play' <<<"$launcher" || {
+            echo "::error::launcher does not start the Flutter binary."
+            exit 1
+          }
+          echo "Linux package contains the decoder and launcher:"
+          echo "  decoder: $(grep -m1 'libmpv\.so\.2' "$listing")"
+          echo "  vendored libs: $(grep -c '/lib/.*\.so' "$listing")"
 
       # ---------------- Android TV ----------------
       - uses: actions/setup-java@v4
