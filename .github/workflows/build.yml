@@ -80,8 +80,15 @@ jobs:
       - name: Generate localizations
         run: flutter gen-l10n
 
+      # `flutter test` compiles the app graph but does not run the analyzer.
+      # This catches syntax/type errors even in files no test imports.
+      # Errors are fatal; the Flutter 3.50 material.dart deprecation notices
+      # are informational across the whole legacy codebase and must not block.
+      - name: Static analysis
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
       # Includes test/compile_all_test.dart, which compiles the entire app
-      # graph. `flutter analyze` alone cannot prove the app builds.
+      # graph and verifies pubspec.yaml / installer version against release.dart.
       - name: Unit tests and whole-app compile gate
         run: flutter test
 

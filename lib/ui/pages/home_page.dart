@@ -19,6 +19,7 @@ import '../theme/tokens.dart';
 import '../widgets/backdrop.dart';
 import '../widgets/cards.dart';
 import '../widgets/cinema_loader.dart';
+import '../widgets/library_card.dart';
 import '../widgets/media_row.dart';
 import '../widgets/mixed_cards.dart';
 import '../widgets/mood_shelf.dart';
@@ -32,6 +33,7 @@ enum _Kind {
 
   continueWatching,
   collections,
+  libraries,
 
   moods,
 }
@@ -259,6 +261,17 @@ class _HomePageState extends State<HomePage> {
         return const <TitleTag>[];
       });
 
+  /// Real server libraries, with their own artwork and item counts. A failing
+  /// /Views call must never wipe out the whole home page or stall its loader.
+  static Future<MixedItems> _libraryTiles(AppServices s) async {
+    try {
+      return <Object>[for (final v in await s.catalog.viewsWithCounts()) if (v.name.isNotEmpty) v];
+    } catch (e) {
+      debugPrint('[home] library views: $e');
+      return const <Object>[];
+    }
+  }
+
   List<_Row> _buildRows(AppServices s) {
     final c = s.catalog;
     final seerr = s.seerr;
@@ -267,10 +280,7 @@ class _HomePageState extends State<HomePage> {
 
     return [
       _Row((l) => l.continueWatching, () => c.continueWatching(), kind: _Kind.continueWatching, recommends: false),
-      _Row((l) => l.myLibraries, () async => <Object>[
-        for (final v in await c.views())
-          if (v.name.isNotEmpty) v,
-      ], style: CardStyle.poster, recommends: false),
+      _Row((l) => l.myLibraries, () => _libraryTiles(s), kind: _Kind.libraries, recommends: false),
       for (final (id, name) in _collections(s))
         _Row((l) => name,
             () => items(c.query(parentId: id, recursive: false, sortBy: 'PremiereDate,ProductionYear,SortName', limit: 100)),
@@ -648,6 +658,7 @@ class _HomePageState extends State<HomePage> {
         final (cardW, areaH) = switch (row.kind) {
           _Kind.collections => (560.0, 560 * 0.42 + 44),
           _Kind.continueWatching => (Zs.landscapeWidth, cardAreaHeight(CardStyle.landscape)),
+          _Kind.libraries => (Zs.landscapeWidth, cardAreaHeight(CardStyle.landscape)),
           _ => (cardWidth(row.style), cardAreaHeight(row.style)),
         };
         if (snap.data == null && !snap.hasError) {
@@ -684,11 +695,9 @@ class _HomePageState extends State<HomePage> {
 
   Widget _card(_Row row, Object data, {required int rank, required bool autofocus}) {
     if (data is LibraryView) {
-      // Use the server's own library cover as a poster tile; tapping it
-      // selects that view in the library page (same path as the rail).
-      return PosterCard(
-        item: EmbyItem(id: data.id, name: data.name, type: 'CollectionFolder', primaryImageTag: data.imageTag),
-        width: cardWidth(CardStyle.poster),
+      return LibraryCard(
+        view: data,
+        width: Zs.landscapeWidth,
         autofocus: autofocus,
         onFocus: () => _focusData(data),
         onSelect: () => widget.onOpenLibraryView?.call(data),

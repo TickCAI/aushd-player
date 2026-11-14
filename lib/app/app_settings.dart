@@ -10,7 +10,7 @@ import 'release.dart';
 const uiLanguages = {'zh': '简体中文', 'en': 'English', 'ro': 'Română', 'fr': 'Français', 'de': 'Deutsch', 'es': 'Español', 'pl': 'Polski'};
 
 const metadataLanguages = {
-  '': '跟随服务器（Emby）',
+  '': 'From the server (Emby)',
   'en-US': 'English',
   'ro-RO': 'Română',
   'fr-FR': 'Français',
@@ -147,10 +147,10 @@ final class AppSettings {
   String get uiMetadataLanguage =>
       const {'zh': 'zh-CN', 'ro': 'ro-RO', 'fr': 'fr-FR', 'de': 'de-DE', 'es': 'es-ES', 'pl': 'pl-PL'}[resolvedUiLanguage] ?? 'en-US';
 
-  /// Even when metadata is set to "follow the server", artwork/title lookups
-  /// done through TMDB (discover, recommendations, collections) stay Chinese.
-  /// `tmdbMetadataEnabled` still controls whether server metadata is replaced.
-  String get tmdbLanguage => metadataLanguage.isEmpty ? 'zh-CN' : metadataLanguage;
+  /// "Follow the server" keeps the user's own scraped titles, but discovery /
+  /// recommendation / artwork lookups still need a language: use the UI one
+  /// instead of hard-coding Chinese for every locale.
+  String get tmdbLanguage => metadataLanguage.isEmpty ? uiMetadataLanguage : metadataLanguage;
 
   bool get tmdbMetadataEnabled => tmdbApiKey.trim().isNotEmpty && metadataLanguage.isNotEmpty;
 

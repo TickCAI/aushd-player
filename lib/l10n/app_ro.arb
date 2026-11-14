@@ -1,5 +1,11 @@
 {
   "@@locale": "ro",
+  "myLibraries": "Bibliotecile mele",
+  "gpuApi": "API grafic",
+  "gpuApiHint": "Implicit este D3D11. Dacă redarea pe ecran complet se oprește pe driverele AMD, încearcă Vulkan sau OpenGL. Se aplică de la următoarea redare.",
+  "gpuApiD3d11": "D3D11 (implicit)",
+  "gpuApiVulkan": "Vulkan (dacă ecranul complet se oprește)",
+  "gpuApiOpengl": "OpenGL / ANGLE",
   "notSet": "Nesetat",
   "save": "Salvează",
   "cancel": "Anulează",

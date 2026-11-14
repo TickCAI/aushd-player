@@ -119,6 +119,12 @@ final class PlayerSettings {
   /// user can switch to Vulkan or OpenGL without replacing the mpv binary.
   final String gpuApi;
 
+  static const gpuApis = {'d3d11', 'vulkan', 'opengl'};
+
+  /// A corrupted/old preference must never be handed to mpv verbatim: an
+  /// unknown `gpu-api` fails mpv_initialize before the player page appears.
+  String get safeGpuApi => gpuApis.contains(gpuApi) ? gpuApi : 'd3d11';
+
   final bool detailedLog;
 
   final double scopeScreen;
@@ -317,7 +323,7 @@ final class PlayerSettings {
       toneMapping: pick('toneMapping', d.toneMapping),
       deband: pick('deband', d.deband),
       videoOutput: pick('vo', d.videoOutput),
-      gpuApi: pick('gpuApi', d.gpuApi),
+      gpuApi: gpuApis.contains(pick<String>('gpuApi', d.gpuApi)) ? pick<String>('gpuApi', d.gpuApi) : d.gpuApi,
       detailedLog: pick('detailedLog', d.detailedLog),
       scopeScreen: pick('scope', d.scopeScreen),
       autoCrop: pick('autoCrop', d.autoCrop),

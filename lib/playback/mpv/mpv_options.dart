@@ -15,6 +15,15 @@ Map<String, String> buildMpvOptions({
   final bitstream = spdif.isNotEmpty;
   final own = !settings.mpvConfOnly;
   final linux = Host.isLinux;
+  final api = settings.safeGpuApi;
+  final vo = linux ? 'libmpv' : (own ? settings.videoOutput : 'gpu-next');
+  // gpu-next only supports d3d11/vulkan on Windows. If the user picked OpenGL
+  // to work around an AMD D3D11 crash, silently pair it with the legacy gpu VO
+  // rather than letting mpv_initialize fail before the player page appears.
+  final effectiveVo = (!linux && api == 'opengl' && vo == 'gpu-next') ? 'gpu' : vo;
+  final d3dDecode = settings.hwdec.startsWith('d3d11') ||
+      settings.hwdec.startsWith('dxva2') ||
+      settings.hwdec.startsWith('nvdec');
   return {
     if (wid != null) 'wid': '$wid',
     'log-file': ?logFile,
@@ -43,17 +52,15 @@ Map<String, String> buildMpvOptions({
     'keep-open': 'yes',
     'idle': 'yes',
 
-    'vo': linux ? 'libmpv' : (own ? settings.videoOutput : 'gpu-next'),
+    'vo': effectiveVo,
     // Windows default used to be hard-coded to d3d11. Some AMD drivers crash
     // inside amdxx64.dll when a D3D11 swapchain is resized by fullscreen, so
     // the graphics API is now user-selectable (Vulkan / OpenGL are compiled
     // into the bundled libmpv). D3D11 hardware decoding is tied to that API,
     // so fall back to mpv's safe automatic decoder on the other backends.
-    if (!linux) 'gpu-api': settings.gpuApi,
+    if (!linux) 'gpu-api': api,
     if (own) ...{
-      'hwdec': settings.hwdec.startsWith('d3d11') && (linux || settings.gpuApi != 'd3d11')
-          ? 'auto-safe'
-          : settings.hwdec,
+      'hwdec': d3dDecode && (linux || api != 'd3d11') ? 'auto-safe' : settings.hwdec,
       if (!linux) 'target-colorspace-hint': settings.hdrPassthrough ? 'yes' : 'no',
       'video-sync': !settings.smoothMotion ? 'audio' : (bitstream ? 'display-vdrop' : 'display-resample'),
       'interpolation': settings.smoothMotion ? 'yes' : 'no',

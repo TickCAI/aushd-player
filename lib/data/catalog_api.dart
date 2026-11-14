@@ -6,13 +6,42 @@ import 'collection_index.dart';
 import 'metadata_localizer.dart';
 
 final class LibraryView {
-  const LibraryView({required this.id, required this.name, this.collectionType, this.imageTag});
+  const LibraryView({
+    required this.id,
+    required this.name,
+    this.collectionType,
+    this.imageTag,
+    this.thumbImageTag,
+    this.logoImageTag,
+    this.backdropImageTags = const [],
+    this.itemCount,
+  });
 
   final String id;
   final String name;
 
   final String? collectionType;
+
+  /// Primary image. Emby auto-generates a collage of movie posters when no
+  /// custom library artwork was uploaded, so this is only a last resort.
   final String? imageTag;
+
+  /// Clean landscape artwork, preferred for library tiles.
+  final String? thumbImageTag;
+  final String? logoImageTag;
+  final List<String> backdropImageTags;
+  final int? itemCount;
+
+  LibraryView copyWith({int? itemCount}) => LibraryView(
+        id: id,
+        name: name,
+        collectionType: collectionType,
+        imageTag: imageTag,
+        thumbImageTag: thumbImageTag,
+        logoImageTag: logoImageTag,
+        backdropImageTags: backdropImageTags,
+        itemCount: itemCount ?? this.itemCount,
+      );
 }
 
 final class ItemPage {
@@ -49,17 +78,46 @@ final class CatalogApi {
   };
 
   Future<List<LibraryView>> views() async {
-    final json = await _janus.client.getJson('/Users/$_userId/Views');
+    final json = await _janus.client.getJson('/Users/$_userId/Views', queryParameters: {
+      'Fields': 'ChildCount,RecursiveItemCount,PrimaryImageAspectRatio',
+      ..._imageArgs,
+    });
     return [
       for (final raw in (json['Items'] as List? ?? const []))
-        if (raw is Map)
+        if (raw is Map && raw['Id'] is String)
           LibraryView(
             id: raw['Id'] as String,
             name: (raw['Name'] as String?) ?? '',
             collectionType: raw['CollectionType'] as String?,
-            imageTag: (raw['ImageTags'] as Map?)?['Primary'] as String?,
+            imageTag: _tag(raw, 'Primary'),
+            thumbImageTag: _tag(raw, 'Thumb'),
+            logoImageTag: _tag(raw, 'Logo'),
+            backdropImageTags: [
+              for (final t in (raw['BackdropImageTags'] as List? ?? const [])) if (t is String) t,
+            ],
+            itemCount: (raw['RecursiveItemCount'] as num?)?.toInt() ?? (raw['ChildCount'] as num?)?.toInt(),
           ),
     ];
+  }
+
+  static String? _tag(Map raw, String kind) {
+    final tags = raw['ImageTags'];
+    final value = tags is Map ? tags[kind] : null;
+    return value is String && value.isNotEmpty ? value : null;
+  }
+
+  /// Adds an accurate item count for each library. Every request is bounded so
+  /// a slow server cannot stall the home page's first frame.
+  Future<List<LibraryView>> viewsWithCounts() async {
+    final views = await this.views();
+    if (views.isEmpty) return views;
+    return await Future.wait([
+      for (final v in views.take(12))
+        query(parentId: v.id, limit: 1, localize: false)
+            .then((page) => v.copyWith(itemCount: page.total))
+            .timeout(const Duration(seconds: 3), onTimeout: () => v)
+            .catchError((Object _) => v),
+    ]);
   }
 
   Future<List<EmbyItem>> resume({int limit = 24}) => _list('/Users/$_userId/Items/Resume', {
@@ -234,11 +292,17 @@ final class CatalogApi {
     return out;
   }
 
-  Future<EmbyItem> item(String id) async {
+  /// Detail lookups must never wait on TMDB: People / MediaSources /
+  /// MediaStreams come straight from the server. Callers that want localized
+  /// artwork can opt in with [localizeMetadata].
+  Future<EmbyItem> item(String id, {bool localizeMetadata = true}) async {
     final json = await _janus.client.getJson('/Users/$_userId/Items/$id', queryParameters: {
       'Fields': detailFields,
+      ..._imageArgs,
     });
-    return localize(EmbyItem.fromJson(json));
+    final parsed = EmbyItem.fromJson(json);
+    if (!localizeMetadata) return parsed;
+    return localize(parsed);
   }
 
   Future<Map<String, int>> seriesTmdbIds(Set<String> seriesIds) async {

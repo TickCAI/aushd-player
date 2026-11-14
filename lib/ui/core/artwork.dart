@@ -102,8 +102,12 @@ extension Artwork on CatalogApi {
     return localized == null ? null : TmdbApi.imageUrl(localized, width: width);
   }
 
-  Uri? _tmdb(String? path, int width, {bool logo = false, bool backdrop = false}) =>
-      path == null ? null : TmdbApi.imageUrl(path, width: width, logo: logo, backdrop: backdrop);
+  Uri? _tmdb(String? path, int width, {bool logo = false, bool backdrop = false}) {
+    // TMDB sometimes returns SVG logos, which the Flutter image codec cannot
+    // decode. Skip them so the server's bitmap logo is used instead.
+    if (path == null || path.toLowerCase().endsWith('.svg')) return null;
+    return TmdbApi.imageUrl(path, width: width, logo: logo, backdrop: backdrop);
+  }
 
   Uri _prefer(Uri primary, Uri? backup) {
     ArtworkFallback.register(primary, backup);

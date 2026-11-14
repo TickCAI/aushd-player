@@ -22,7 +22,10 @@ abstract final class TrackLabels {
       parts.add(subtitleCodec(s, l10n));
     }
     final t = s.title;
-    if (t != null && t.isNotEmpty && t != title(s, l10n) && !_isRedundant(t, s)) parts.add(t);
+    // Compare with the untranslated language too: after Chinese localization
+    // "English" no longer equals "英语", which used to render "英语 · English".
+    final raw = s.displayLanguage ?? _languageName(s.language);
+    if (t != null && t.isNotEmpty && t != title(s, l10n) && t != raw && !_isRedundant(t, s)) parts.add(t);
     if (s.isForced) parts.add(l10n.trackForced);
     if (s.isDefault) parts.add(l10n.trackDefault);
     if (s.isExternal) parts.add(l10n.trackExternal);

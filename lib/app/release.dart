@@ -1,6 +1,6 @@
 abstract final class Release {
   /// Version shown in Settings and sent to the distribution service.
-  static const version = '1.0.4';
+  static const version = '1.0.5';
   static const name = 'AusHD Player $version';
   static const tag = 'v$version';
 

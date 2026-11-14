@@ -76,7 +76,13 @@ final class MpvBackend implements PlayerBackend {
 
   @override
   Future<void> open() async {
-    final wid = Host.isLinux ? null : await VideoHost.create();
+    // A stuck native "create video host" call used to leave playItem awaiting
+    // forever, with no player page and no log line at all. Bound it so the
+    // launcher can report the failure instead of silently doing nothing.
+    final wid = Host.isLinux
+        ? null
+        : await VideoHost.create().timeout(const Duration(seconds: 8),
+            onTimeout: () => throw StateError('the video host did not respond within 8 s'));
     final logFile = _settings.detailedLog ? AppLog.sidePath('mpv') : null;
     final options = buildMpvOptions(
       wid: wid,
@@ -87,8 +93,16 @@ final class MpvBackend implements PlayerBackend {
     );
     debugPrint('[mpv] options: ${[for (final e in options.entries) if (e.key != 'wid') '${e.key}=${e.value}'].join(' ')}');
     if (logFile != null) debugPrint('[mpv] detailed log: $logFile');
-    _mpv = MpvPlayer.create(options: options, logLevel: _settings.detailedLog ? 'info' : 'warn');
-    if (Host.isLinux) await VideoHost.attach(_mpv.address);
+    try {
+      _mpv = MpvPlayer.create(options: options, logLevel: _settings.detailedLog ? 'info' : 'warn');
+    } catch (e) {
+      debugPrint('[mpv] initialization failed with these options: $e');
+      rethrow;
+    }
+    if (Host.isLinux) {
+      await VideoHost.attach(_mpv.address).timeout(const Duration(seconds: 8),
+          onTimeout: () => throw StateError('attaching the video host timed out'));
+    }
     _sub = _mpv.events.listen(_onEvent);
     VideoHost.onInput = _mpv.commandAsync;
     _mpv.state.addListener(_onState);

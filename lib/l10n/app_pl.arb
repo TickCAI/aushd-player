@@ -1,5 +1,11 @@
 {
   "@@locale": "pl",
+  "myLibraries": "Moje biblioteki",
+  "gpuApi": "Interfejs graficzny",
+  "gpuApiHint": "Domyślnie D3D11. Jeśli odtwarzanie na pełnym ekranie przerywa się na sterownikach AMD, wypróbuj Vulkan lub OpenGL. Zmiana działa od następnego odtwarzania.",
+  "gpuApiD3d11": "D3D11 (domyślnie)",
+  "gpuApiVulkan": "Vulkan (gdy pełny ekran przerywa)",
+  "gpuApiOpengl": "OpenGL / ANGLE",
   "notSet": "Nie ustawiono",
   "save": "Zapisz",
   "cancel": "Anuluj",

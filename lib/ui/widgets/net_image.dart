@@ -14,15 +14,27 @@ import 'image_disk_cache.dart';
 /// a backup for each localized URL, so a failed CDN request silently falls back
 /// instead of leaving an empty card. No widget needs to know about the backup.
 abstract final class ArtworkFallback {
+  static const _maxEntries = 3000;
   static final Map<Uri, Uri> _byUrl = <Uri, Uri>{};
 
   static Uri? of(Uri url) => _byUrl[url];
 
   static void register(Uri primary, Uri? backup) {
-    if (backup == null || backup == primary) return;
-    if (_byUrl.length > 3000) _byUrl.clear();
+    // A null backup means "no server image available": drop any stale mapping
+    // instead of leaving the old (possibly deleted) URL in place.
+    if (backup == null || backup == primary) {
+      _byUrl.remove(primary);
+      return;
+    }
+    // Evict the oldest entry. Clearing the whole table made in-flight images
+    // lose their backup mid-scroll.
+    if (_byUrl.length >= _maxEntries && !_byUrl.containsKey(primary)) {
+      _byUrl.remove(_byUrl.keys.first);
+    }
     _byUrl[primary] = backup;
   }
+
+  static void clear() => _byUrl.clear();
 }
 
 @immutable
@@ -48,6 +60,20 @@ class NetImageProvider extends ImageProvider<NetImageProvider> {
 
   Future<ui.Codec> _load(ImageDecoderCallback decode) async {
     final bytes = await _bytes();
+    try {
+      return await _decode(decode, bytes);
+    } catch (error) {
+      // TMDB logos are often SVG, which Flutter's image codec cannot decode.
+      // Network-level fallback alone never caught these, so the logo simply
+      // disappeared. Retry with the server's own artwork on decode failures.
+      final backup = ArtworkFallback.of(url);
+      if (backup == null || backup == url) rethrow;
+      debugPrint('[image] decode fallback $url -> $backup ($error)');
+      return _decode(decode, await _fetch(backup));
+    }
+  }
+
+  Future<ui.Codec> _decode(ImageDecoderCallback decode, Uint8List bytes) async {
     final buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
     return decode(buffer, getTargetSize: (w, h) {
       final target = decodeWidth;
@@ -58,14 +84,19 @@ class NetImageProvider extends ImageProvider<NetImageProvider> {
 
   Future<Uint8List> _bytes() async {
     try {
-      // Localized CDN images are preferred, but must not stall the UI for the
-      // full network timeout when the CDN is blocked; fall back quickly.
-      return await _fetch(url, timeout: const Duration(seconds: 8));
+      // Only URLs that actually have a server backup get the short timeout;
+      // ordinary server/avatar images keep the full network budget.
+      final hasBackup = ArtworkFallback.of(url) != null;
+      return await _fetch(url, timeout: hasBackup ? const Duration(seconds: 8) : const Duration(seconds: 20));
     } catch (error) {
       final backup = ArtworkFallback.of(url);
       if (backup == null || backup == url) rethrow;
       debugPrint('[image] fallback $url -> $backup ($error)');
-      return await _fetch(backup);
+      final data = await _fetch(backup);
+      // Cache under the primary URL too, otherwise every cold start waits the
+      // full CDN timeout again before showing the server image.
+      writeCachedImage(url, data);
+      return data;
     }
   }
 

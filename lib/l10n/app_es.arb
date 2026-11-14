@@ -1,5 +1,11 @@
 {
   "@@locale": "es",
+  "myLibraries": "Mis bibliotecas",
+  "gpuApi": "API gráfica",
+  "gpuApiHint": "D3D11 es el valor predeterminado. Si la reproducción a pantalla completa falla con controladores AMD, prueba Vulkan u OpenGL. Se aplica en la siguiente reproducción.",
+  "gpuApiD3d11": "D3D11 (predeterminado)",
+  "gpuApiVulkan": "Vulkan (si falla a pantalla completa)",
+  "gpuApiOpengl": "OpenGL / ANGLE",
   "notSet": "Sin definir",
   "save": "Guardar",
   "cancel": "Cancelar",

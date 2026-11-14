@@ -80,7 +80,14 @@ class _DetailsPageState extends State<DetailsPage> {
   Future<void> _load(String id, {bool focusPlay = true}) async {
     final s = AppServicesScope.read(context);
     try {
-      final results = await Future.wait([s.catalog.item(id), PlayerSettings.load()]);
+      // The server is the only source for People / MediaSources / MediaStreams.
+      // Going through MetadataLocalizer here used to put detail pages behind a
+      // TMDB queue shared with the full-library collection scan, which left the
+      // page stuck on the card-level item (no cast, no media info) forever.
+      final results = await Future.wait([
+        s.catalog.item(id, localizeMetadata: false),
+        PlayerSettings.load(),
+      ]).timeout(const Duration(seconds: 15));
       final item = results[0] as EmbyItem;
       _player = results[1] as PlayerSettings;
       debugPrint('[details] ${item.type} "${item.name}" (${item.id}): resume ${item.resumePosition ?? 'none'}, '
@@ -99,6 +106,13 @@ class _DetailsPageState extends State<DetailsPage> {
         debugPrint('[details] chapters of ${item.id}: $e');
       });
       _loadExtras(s, item);
+      // Chinese artwork is a nice-to-have, never a prerequisite. Apply it
+      // after the page is usable, and only if we are still showing this item.
+      s.catalog.localize(item).timeout(const Duration(seconds: 4)).then((localized) {
+        if (mounted && _item?.id == localized.id && _error == null) setState(() => _item = localized);
+      }).catchError((Object e) {
+        debugPrint('[details] artwork localization of ${item.id}: $e');
+      });
       if (item.isMovie) {
         s.catalog.collectionOf(item).then((v) {
           debugPrint('[details] collection of ${item.name}: ${v == null ? 'none' : '${v.collection.name} (${v.films.length} films)'}');
@@ -305,9 +319,10 @@ class _DetailsPageState extends State<DetailsPage> {
   @override
   Widget build(BuildContext context) {
     final item = _item;
-    if (item == null) {
-      return _error != null ? _ErrorView(error: _error!, onRetry: () => _load(widget.itemId)) : const _Loading();
-    }
+    // Show failures even when the card-level item is already on screen; the
+    // old condition hid every error behind a "normal looking" half-loaded page.
+    if (_error != null && item == null) return _ErrorView(error: _error!, onRetry: () => _load(widget.itemId));
+    if (item == null) return const _Loading();
     final s = AppServicesScope.of(context);
     final c = s.catalog;
     final l10n = context.l10n;

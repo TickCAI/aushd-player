@@ -1,5 +1,11 @@
 {
   "@@locale": "de",
+  "myLibraries": "Meine Bibliotheken",
+  "gpuApi": "Grafik-API",
+  "gpuApiHint": "Standard ist D3D11. Wenn die Vollbildwiedergabe bei AMD-Treibern abstürzt, Vulkan oder OpenGL versuchen. Gilt ab der nächsten Wiedergabe.",
+  "gpuApiD3d11": "D3D11 (Standard)",
+  "gpuApiVulkan": "Vulkan (bei Abstürzen im Vollbild)",
+  "gpuApiOpengl": "OpenGL / ANGLE",
   "notSet": "Nicht festgelegt",
   "save": "Speichern",
   "cancel": "Abbrechen",

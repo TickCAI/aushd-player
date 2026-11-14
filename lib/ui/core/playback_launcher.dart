@@ -8,6 +8,7 @@ import '../../playback/platform_player.dart';
 import '../../playback/playback_session.dart';
 import '../../playback/player_settings.dart';
 import '../../playback/trailer/trailer_player.dart';
+import '../widgets/common.dart';
 import '../widgets/profile_widgets.dart';
 import '../widgets/trailer.dart';
 import 'artwork.dart';
@@ -20,6 +21,9 @@ final class PlaybackOutcome {
 }
 
 bool _playing = false;
+DateTime? _playingSince;
+
+const _launchLockTimeout = Duration(seconds: 30);
 
 bool get playbackActive => _playing;
 
@@ -30,7 +34,23 @@ bool _live = false;
 
 void _setPlaying(bool v) {
   _playing = v;
+  _playingSince = v ? DateTime.now() : null;
   playbackActiveNotifier.value = v;
+}
+
+/// Returns false when the caller should NOT start a new playback, because a
+/// previous launch is still in flight. A launch that never returned (a stuck
+/// platform channel, for instance) must not lock the whole session forever.
+bool _acquireLaunchLock() {
+  if (!_playing) return true;
+  final started = _playingSince;
+  if (started != null && DateTime.now().difference(started) > _launchLockTimeout) {
+    debugPrint('[playback] stale launch lock after ${DateTime.now().difference(started).inSeconds}s: resetting');
+    _setPlaying(false);
+    return true;
+  }
+  debugPrint('[playback] ignored: a previous launch is still active');
+  return false;
 }
 
 Future<PlaybackOutcome?> playItem(
@@ -41,17 +61,25 @@ Future<PlaybackOutcome?> playItem(
   int? audioIndex,
   int? subtitleIndex,
 }) async {
-  if (_playing) return null;
+  if (!_acquireLaunchLock()) return null;
   _setPlaying(true);
+  final l10n = context.l10n;
   try {
     final services = AppServicesScope.read(context);
-    final l10n = context.l10n;
     final navigator = Navigator.of(context, rootNavigator: true);
     TrailerController.suspendAll();
-    await TrailerPlayer.stopAll();
+    debugPrint('[playback] launching ${item.type} ${item.id}');
+    await TrailerPlayer.stopAll().timeout(const Duration(seconds: 5), onTimeout: () {
+      debugPrint('[playback] stopping trailers timed out');
+      return Future<void>.value();
+    });
     final target = item.isSeries || item.isSeason ? await services.catalog.episodeToPlay(item) : item;
     if (target == null) return null;
-    final full = target.mediaSources.isNotEmpty || target.isChannel ? target : await services.catalog.item(target.id);
+    // MediaSources must come straight from Emby. Localization can queue behind
+    // background TMDB work and used to leave the play button unresponsive.
+    final full = target.mediaSources.isNotEmpty || target.isChannel
+        ? target
+        : await services.catalog.item(target.id, localizeMetadata: false);
     final settings = await PlayerSettings.load();
     final acceptBadCerts = services.settings.acceptInvalidCertificates;
     final session = PlaybackSession(
@@ -70,7 +98,7 @@ Future<PlaybackOutcome?> playItem(
       localize: services.catalog.localize,
       together: services.together,
       avatarOf: (member) => memberAvatar(services, member),
-      fetchItem: services.catalog.item,
+      fetchItem: (id) => services.catalog.item(id, localizeMetadata: false),
       settings: settings,
       l10n: l10n,
       acceptInvalidCertificates: acceptBadCerts,
@@ -89,6 +117,12 @@ Future<PlaybackOutcome?> playItem(
     ));
     services.markLibraryChanged();
     return PlaybackOutcome(reason, session.lastItem ?? full);
+  } catch (e, stack) {
+    // Without this, an mpv initialization failure (bad gpu-api, missing
+    // native window, etc.) looked exactly like "clicking play does nothing".
+    debugPrint('[playback] launch failed: $e\n$stack');
+    if (context.mounted) showToast(context, l10n.playbackFailedWith('$e'));
+    return null;
   } finally {
     _setPlaying(false);
   }
@@ -103,15 +137,18 @@ Future<void> playChannel(BuildContext context, ZapList zap, int index) async {
 }
 
 Future<void> playShared(BuildContext context, LiveShare share, {ZapList? zap, int channel = 0}) async {
-  if (_playing) return;
+  if (!_acquireLaunchLock()) return;
   _setPlaying(true);
   _live = true;
+  final l10n = context.l10n;
   try {
     final services = AppServicesScope.read(context);
-    final l10n = context.l10n;
     final navigator = Navigator.of(context, rootNavigator: true);
     TrailerController.suspendAll();
-    await TrailerPlayer.stopAll();
+    await TrailerPlayer.stopAll().timeout(const Duration(seconds: 5), onTimeout: () {
+      debugPrint('[playback] stopping trailers timed out');
+      return Future<void>.value();
+    });
     final settings = await PlayerSettings.load();
     final session = LiveSession(
       player: createPlayer(
@@ -131,6 +168,9 @@ Future<void> playShared(BuildContext context, LiveShare share, {ZapList? zap, in
       channel: channel,
     );
     await session.run(share.first);
+  } catch (e, stack) {
+    debugPrint('[playback] shared launch failed: $e\n$stack');
+    if (context.mounted) showToast(context, l10n.playbackFailedWith('$e'));
   } finally {
     _live = false;
     _setPlaying(false);

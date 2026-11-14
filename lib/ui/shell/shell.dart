@@ -121,6 +121,16 @@ class _ShellState extends State<Shell> {
     }
   }
 
+  Uri? _libraryCover(catalog.LibraryView v) {
+    final c = _services.catalog;
+    if (v.thumbImageTag != null) return c.image(v.id, catalog.ImageKind.thumb, tag: v.thumbImageTag, width: 96);
+    if (v.backdropImageTags.isNotEmpty) {
+      return c.image(v.id, catalog.ImageKind.backdrop, tag: v.backdropImageTags.first, width: 96);
+    }
+    if (v.imageTag != null) return c.image(v.id, catalog.ImageKind.primary, tag: v.imageTag, width: 96);
+    return null;
+  }
+
   Future<void> _loadLibraryViews() async {
     final services = _services;
     if (!services.isSignedIn) {
@@ -137,13 +147,14 @@ class _ShellState extends State<Shell> {
       final views = await services.catalog.views();
       if (!mounted) return;
       final list = [for (final v in views) if (v.name.isNotEmpty) v];
+      final covers = <String, Uri>{};
+      for (final v in list) {
+        final cover = _libraryCover(v);
+        if (cover != null) covers[v.id] = cover;
+      }
       setState(() {
         _libraryViews = list;
-        _libraryCovers = {
-          for (final v in list)
-            if (v.imageTag != null)
-              v.id: services.catalog.image(v.id, catalog.ImageKind.primary, tag: v.imageTag, width: 96),
-        };
+        _libraryCovers = covers;
         if (_activeView != null && !list.any((v) => v.id == _activeView!.id)) _activeView = null;
       });
     } catch (e) {

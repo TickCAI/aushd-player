@@ -69,10 +69,19 @@ final class MetadataLocalizer {
 
   Future<List<EmbyItem>> localizeAll(List<EmbyItem> items) async {
     if (items.isEmpty || _rejected) return items;
+    // The full-library collection scan shares this localizer. If its queue is
+    // already saturated, do not make the visible page wait behind thousands of
+    // background requests -- the server's own artwork is a perfectly good
+    // fallback and the localized version arrives on the next visit.
+    if (_gate.backlog > 24) {
+      debugPrint('[TMDB] localize skipped for ${items.length} items (${_gate.backlog} queued)');
+      return items;
+    }
     await _TmdbCache.instance.ready;
     try {
       await _resolveSeries(items);
-      return await Future.wait(items.map(_localizeOne));
+      return await Future.wait(items.map(_localizeOne))
+          .timeout(const Duration(seconds: 6), onTimeout: () => items);
     } catch (e) {
       debugPrint('[TMDB] localize failed: $e');
       return items;
@@ -121,11 +130,16 @@ final class MetadataLocalizer {
           final id = item.tmdbId;
           if (id == null) return item;
           final out = _apply(item, await _doc('movie/$id', () => _title('/movie/$id')));
+          // Cast photos are metadata, not artwork: "follow the server" mode
+          // must not pay for a second TMDB request on every single movie.
+          if (artworkOnly) return out;
           return await _withCast(out, 'movie/$id');
         case 'Series':
           final id = item.tmdbId;
           if (id == null) return item;
-          return await _withCast(_apply(item, await _series(id)), 'tv/$id');
+          final out = _apply(item, await _series(id));
+          if (artworkOnly) return out;
+          return await _withCast(out, 'tv/$id');
         case 'BoxSet':
           final id = item.tmdbId;
           if (id == null) return item;
@@ -234,7 +248,7 @@ final class MetadataLocalizer {
         var overview = _str(j['overview']);
         final gaps = overview == null ||
             episodes.values.any((e) => _str(e['title']) == null || _str(e['overview']) == null);
-        if (!_english && gaps) {
+        if (!artworkOnly && !_english && gaps) {
           final en = await _tmdb.get(path, language: 'en-US');
           if (en != null) {
             overview ??= _str(en['overview']);
@@ -404,6 +418,8 @@ final class _Gate {
   final int _max;
   int _running = 0;
   final _waiting = <Completer<void>>[];
+
+  int get backlog => _waiting.length;
 
   Future<T> run<T>(Future<T> Function() task) async {
     if (_running >= _max) {

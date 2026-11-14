@@ -1,5 +1,11 @@
 {
   "@@locale": "fr",
+  "myLibraries": "Mes médiathèques",
+  "gpuApi": "API graphique",
+  "gpuApiHint": "D3D11 est la valeur par défaut. Si la lecture en plein écran plante avec les pilotes AMD, essayez Vulkan ou OpenGL. Appliqué à la prochaine lecture.",
+  "gpuApiD3d11": "D3D11 (par défaut)",
+  "gpuApiVulkan": "Vulkan (en cas de plantage plein écran)",
+  "gpuApiOpengl": "OpenGL / ANGLE",
   "notSet": "Non défini",
   "save": "Enregistrer",
   "cancel": "Annuler",
