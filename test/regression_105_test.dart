@@ -93,6 +93,15 @@ void main() {
     expect(enriched.itemCount, 128);
   });
 
+  test('a virtual ChildCount must never be displayed as a library item count', () {
+    // /Views returns ChildCount: 1 on CollectionFolders. v1.0.6 read that as
+    // "1 部" on every tile. Only a real RecursiveItemCount is meaningful.
+    expect(CatalogApi.libraryItemCount(const {'ChildCount': 1}), isNull);
+    expect(CatalogApi.libraryItemCount(const {'ChildCount': 1, 'RecursiveItemCount': 1}), isNull);
+    expect(CatalogApi.libraryItemCount(const {'ChildCount': 1, 'RecursiveItemCount': 128}), 128);
+    expect(CatalogApi.libraryItemCount(const {}), isNull);
+  });
+
   test('TMDB is only consulted when the server left a real gap', () {
     EmbyItem scraped({
       String? imageTag = 'poster-tag',

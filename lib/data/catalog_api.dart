@@ -100,89 +100,86 @@ final class CatalogApi {
     'EnableUserData': 'true',
   };
 
-  /// Home page tiles are rebuilt on every navigation; keep the enriched view
-  /// list for a few minutes instead of issuing one query per library each time.
-  ({DateTime at, List<LibraryView> data})? _enrichedViews;
+  /// A single /Views call serves the home shelf, the rail and the library
+  /// page. They all rebuild at startup, so share one in-flight request and a
+  /// short cache instead of hitting the server three times.
+  Future<List<LibraryView>>? _viewsFlight;
+  ({DateTime at, List<LibraryView> data})? _viewsCache;
 
-  Future<List<LibraryView>> views() async {
-    final json = await _janus.client.getJson('/Users/$_userId/Views', queryParameters: {
-      'Fields': 'ChildCount,RecursiveItemCount,PrimaryImageAspectRatio,Overview',
-      ..._imageArgs,
-    });
-    return [
-      for (final raw in (json['Items'] as List? ?? const []))
-        if (raw is Map && raw['Id'] is String)
-          LibraryView(
-            id: raw['Id'] as String,
-            name: (raw['Name'] as String?) ?? '',
-            collectionType: raw['CollectionType'] as String?,
-            imageTag: _tag(raw, 'Primary'),
-            thumbImageTag: _tag(raw, 'Thumb'),
-            logoImageTag: _tag(raw, 'Logo'),
-            backdropImageTags: [
-              for (final t in (raw['BackdropImageTags'] as List? ?? const [])) if (t is String) t,
-            ],
-            itemCount: (raw['RecursiveItemCount'] as num?)?.toInt() ?? (raw['ChildCount'] as num?)?.toInt(),
-            overview: raw['Overview'] as String?,
-          ),
-    ];
-  }
+  void invalidateViews() => _viewsCache = null;
 
-  /// One pass per library returns both the authoritative item count and a
-  /// real landscape still to use as the tile artwork.
-  Future<List<LibraryView>> viewsWithCounts() async {
-    final cached = _enrichedViews;
-    if (cached != null && DateTime.now().difference(cached.at) < const Duration(minutes: 5)) {
-      return cached.data;
+  Future<List<LibraryView>> views() {
+    final cached = _viewsCache;
+    if (cached != null && DateTime.now().difference(cached.at) < const Duration(seconds: 30)) {
+      return Future.value(cached.data);
     }
-    final views = await this.views();
-    if (views.isEmpty) return views;
-    final enriched = await Future.wait([
-      for (final v in views.take(12)) _enrichView(v),
-    ]);
-    _enrichedViews = (at: DateTime.now(), data: enriched);
-    return enriched;
+    final flight = _viewsFlight;
+    if (flight != null) return flight;
+    final pending = _fetchViews();
+    _viewsFlight = pending;
+    return pending.whenComplete(() => _viewsFlight = null);
   }
 
-  Future<LibraryView> _enrichView(LibraryView v) async {
-    ItemPage page;
+  Future<List<LibraryView>> _fetchViews() async {
     try {
-      page = await query(parentId: v.id, limit: 12, sortBy: 'DateCreated', descending: true, localize: false)
-          .timeout(const Duration(seconds: 4));
+      final json = await _janus.client
+          .getJson('/Users/$_userId/Views', queryParameters: {
+            'Fields': 'ChildCount,RecursiveItemCount,PrimaryImageAspectRatio,Overview',
+            ..._imageArgs,
+          })
+          .timeout(const Duration(seconds: 10));
+      final list = <LibraryView>[
+        for (final raw in (json['Items'] as List? ?? const []))
+          if (raw is Map && raw['Id'] is String)
+            LibraryView(
+              id: raw['Id'] as String,
+              name: (raw['Name'] as String?) ?? '',
+              collectionType: raw['CollectionType'] as String?,
+              imageTag: _tag(raw, 'Primary'),
+              thumbImageTag: _tag(raw, 'Thumb'),
+              logoImageTag: _tag(raw, 'Logo'),
+              backdropImageTags: [
+                for (final t in (raw['BackdropImageTags'] as List? ?? const [])) if (t is String) t,
+              ],
+              itemCount: libraryItemCount(raw),
+              overview: raw['Overview'] as String?,
+            ),
+      ];
+      _viewsCache = (at: DateTime.now(), data: list);
+      return list;
     } catch (_) {
-      // Some servers reject DateCreated as a sort field. A plain name-ordered
-      // query still gives us artwork, and /Views already has the real count.
-      try {
-        page = await query(parentId: v.id, limit: 12, localize: false).timeout(const Duration(seconds: 4));
-      } catch (_) {
-        return v;
-      }
+      // A brief server hiccup must not blank every library tile.
+      final stale = _viewsCache?.data;
+      if (stale != null) return stale;
+      rethrow;
     }
-    // `TotalRecordCount` is capped by Limit on a few Emby/Jellyfin builds (it
-    // used to make every library read "1 部"), while RecursiveItemCount from
-    // /Views is the authoritative number. Never let the smaller value win.
-    final count = bestLibraryCount(v.itemCount, page.total > 0 ? page.total : null);
-    return v.copyWith(itemCount: count, featuredArtwork: _featuredArtwork(page.items) ?? v.featuredArtwork);
   }
 
-  /// Kept pure so the "every library shows 1 film" regression stays covered by
-  /// a unit test without a live server.
+  /// Only RecursiveItemCount is a real title count. ChildCount on a
+  /// CollectionFolder is usually 1 (the virtual folder itself); using it made
+  /// every library read "1 部". Hide the badge rather than guessing.
+  static int? libraryItemCount(Map raw) {
+    final recursive = raw['RecursiveItemCount'];
+    if (recursive is num && recursive > 1) return recursive.toInt();
+    return null;
+  }
+
+  /// Kept as the name used by the home shelf and the rail.
+  ///
+  /// v1.0.6 issued one recursive `/Items?ParentId=...&Limit=12` query per
+  /// library (plus a retry on failure) to find a "prettier" backdrop. With 34
+  /// libraries, home + rail fired dozens of slow scans at once; the reverse
+  /// proxy began returning 504 for *every* request, which also killed the hero
+  /// carousel, continue-watching and all artwork. /Views already contains the
+  /// name, type, image tags, overview and item count, so no extra request is
+  /// needed at all.
+  Future<List<LibraryView>> viewsWithCounts() => views();
+
+  /// Pure helper kept for merging counts when both sources are trustworthy.
   static int? bestLibraryCount(int? fromViews, int? fromQuery) {
     if (fromViews == null) return fromQuery;
     if (fromQuery == null) return fromViews;
     return fromViews > fromQuery ? fromViews : fromQuery;
-  }
-
-  static LibraryArtworkRef? _featuredArtwork(List<EmbyItem> items) {
-    for (final item in items) {
-      if (item.backdropImageTags.isNotEmpty) {
-        return LibraryArtworkRef(item.id, ImageKind.backdrop, item.backdropImageTags.first);
-      }
-    }
-    for (final item in items) {
-      if (item.thumbImageTag != null) return LibraryArtworkRef(item.id, ImageKind.thumb, item.thumbImageTag);
-    }
-    return null;
   }
 
   /// Shared by the home shelf and the rail so both show the same artwork.
