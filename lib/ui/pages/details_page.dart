@@ -106,12 +106,14 @@ class _DetailsPageState extends State<DetailsPage> {
         debugPrint('[details] chapters of ${item.id}: $e');
       });
       _loadExtras(s, item);
-      // Chinese artwork is a nice-to-have, never a prerequisite. Apply it
-      // after the page is usable, and only if we are still showing this item.
-      s.catalog.localize(item).timeout(const Duration(seconds: 4)).then((localized) {
-        if (mounted && _item?.id == localized.id && _error == null) setState(() => _item = localized);
+      // Only fill what the server's scraper left out (artwork, cast, synopsis).
+      // A fully scraped item costs zero TMDB requests; a gap costs at most two.
+      s.catalog.localize(item).timeout(const Duration(seconds: 8)).then((filled) {
+        if (mounted && _item?.id == filled.id && !identical(_item, filled) && _error == null) {
+          setState(() => _item = filled);
+        }
       }).catchError((Object e) {
-        debugPrint('[details] artwork localization of ${item.id}: $e');
+        debugPrint('[details] gap filling of ${item.id}: $e');
       });
       if (item.isMovie) {
         s.catalog.collectionOf(item).then((v) {

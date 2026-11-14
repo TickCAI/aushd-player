@@ -193,7 +193,7 @@
   "metadataLanguage": "元数据语言",
   "metadataFromServer": "跟随服务器",
   "metadataLanguageNeedsKey": "需要 TMDB API 密钥；未设置前显示服务器上的元数据。",
-  "metadataLanguageHint": "缺少翻译时先回退到英文，再回退到服务器。「发现」和「求片」同样适用。",
+  "metadataLanguageHint": "媒体库本身已刮削完成，TMDB 仅在打开影片后发现海报、简介或演职人员缺失时补漏，不会批量请求。「发现」和「求片」同样适用。",
   "testTmdbKey": "测试 TMDB 密钥",
   "tmdbKeyFirst": "请先填写 TMDB 密钥",
   "tmdbKeyWorks": "TMDB 密钥可用",

@@ -9,7 +9,6 @@ import '../core/storage/shared_preferences_store.dart';
 import '../core/emby/models/emby_item.dart';
 import '../core/emby/server_kind.dart';
 import '../data/catalog_api.dart';
-import '../data/collection_index.dart';
 import '../data/metadata_localizer.dart';
 import '../data/recommendations.dart';
 import '../data/seerr_api.dart';
@@ -349,7 +348,7 @@ final class AppServices extends ChangeNotifier {
 
   void _rebuildMetadata() {
     final s = _settings;
-    final localizer = catalog.localizer = s.tmdbApiKey.trim().isEmpty
+    catalog.localizer = s.tmdbApiKey.trim().isEmpty
         ? null
         : MetadataLocalizer(
             tmdb: TmdbApi(apiKey: s.tmdbApiKey),
@@ -359,14 +358,11 @@ final class AppServices extends ChangeNotifier {
             // titles and synopses the user's own scraper produced.
             artworkOnly: s.metadataLanguage.isEmpty,
           );
-    final key = s.tmdbApiKey.trim();
-    catalog.collections = key.isEmpty
-        ? null
-        : CollectionIndex(
-            movies: catalog.movieRefs,
-            tmdb: localizer ??
-                MetadataLocalizer(tmdb: TmdbApi(apiKey: key), language: TmdbApi.defaultLanguage, seriesTmdbIds: catalog.seriesTmdbIds),
-          );
+    // Collections are read from the server's own BoxSets. Building a TMDB
+    // collection index used to sweep the entire library (up to 240 online
+    // probes) and was the main source of TMDB request storms. The localizer
+    // above is kept only for on-demand gap filling on a detail page.
+    catalog.collections = null;
   }
 }
 

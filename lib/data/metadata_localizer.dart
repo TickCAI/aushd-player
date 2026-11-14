@@ -65,14 +65,18 @@ final class MetadataLocalizer {
   String get _imageLanguages =>
       _english ? 'en,null' : [_lang, if (_lang != 'zh') 'zh', 'null', 'en'].join(',');
 
-  Future<EmbyItem> localize(EmbyItem item) async => (await localizeAll([item])).first;
+  /// The user's Emby/Jellyfin library is already scraped. Lists, shelves,
+  /// searches and the home page must NEVER hit TMDB -- they render exactly what
+  /// the server has. [fillMissing] is the only path that may issue a request:
+  /// once, when a title is opened, and only for fields the server left empty.
+  Future<EmbyItem> localize(EmbyItem item) => fillMissing(item);
 
+  /// Explicit, opt-in batch localization. No UI list may call this: the home
+  /// page, library, search and recommendations render server metadata only.
+  /// It is kept for a future "re-scrape this selection" action, so every
+  /// private helper below still has a legitimate (but never automatic) entry.
   Future<List<EmbyItem>> localizeAll(List<EmbyItem> items) async {
     if (items.isEmpty || _rejected) return items;
-    // The full-library collection scan shares this localizer. If its queue is
-    // already saturated, do not make the visible page wait behind thousands of
-    // background requests -- the server's own artwork is a perfectly good
-    // fallback and the localized version arrives on the next visit.
     if (_gate.backlog > 24) {
       debugPrint('[TMDB] localize skipped for ${items.length} items (${_gate.backlog} queued)');
       return items;
@@ -80,12 +84,100 @@ final class MetadataLocalizer {
     await _TmdbCache.instance.ready;
     try {
       await _resolveSeries(items);
-      return await Future.wait(items.map(_localizeOne))
-          .timeout(const Duration(seconds: 6), onTimeout: () => items);
+      return await Future.wait(items.map(_localizeOne)).timeout(const Duration(seconds: 6), onTimeout: () => items);
     } catch (e) {
       debugPrint('[TMDB] localize failed: $e');
       return items;
     }
+  }
+
+  final _fillAttempted = <String>{};
+
+  /// A domestic user notices missing artwork, a missing synopsis/genres, or an
+  /// empty cast list. If the server supplied all of those, no request is made.
+  static bool needsFill(EmbyItem item) {
+    if ((item.type != 'Movie' && item.type != 'Series') || item.tmdbId == null) return false;
+    final noArtwork = item.primaryImageTag == null &&
+        item.thumbImageTag == null &&
+        item.seriesPrimaryImageTag == null &&
+        item.backdropImageTags.isEmpty &&
+        item.parentBackdropImageTags.isEmpty;
+    final noText = (item.overview?.trim().isEmpty ?? true) || item.genres.isEmpty;
+    return noArtwork || noText || item.people.isEmpty;
+  }
+
+  /// On-demand "fill the gaps" for a single title the user just opened.
+  /// At most two cached requests (title+images, then credits) and never twice
+  /// for the same item in a session, so this cannot turn into a request storm.
+  Future<EmbyItem> fillMissing(EmbyItem item) async {
+    if (_rejected || !needsFill(item)) return item;
+    if (!_fillAttempted.add(item.id)) return item;
+    await _TmdbCache.instance.ready;
+    try {
+      final id = item.tmdbId!;
+      final path = item.type == 'Series' ? 'tv/$id' : 'movie/$id';
+      final doc = await _doc(path, () => _title('/$path')).timeout(const Duration(seconds: 6));
+      if (doc == null) return item;
+      var out = _fillGaps(item, doc);
+      if (item.people.isEmpty) {
+        out = await _fillCast(out, path).timeout(const Duration(seconds: 6), onTimeout: () => out);
+      }
+      debugPrint('[TMDB] filled gaps for "${item.name}" (${item.id})');
+      return out;
+    } catch (e) {
+      debugPrint('[TMDB] fill ${item.id}: $e');
+      return item;
+    }
+  }
+
+  EmbyItem _fillGaps(EmbyItem item, Map<String, dynamic> doc) {
+    final hasPoster = item.primaryImageTag != null || item.thumbImageTag != null || item.seriesPrimaryImageTag != null;
+    final hasBackdrop = item.backdropImageTags.isNotEmpty || item.parentBackdropImageTags.isNotEmpty;
+    final collection = doc['collection'] is Map ? doc['collection'] as Map : null;
+    // copyWith keeps the server value whenever null is passed: this only ever
+    // fills blanks, it never replaces the user's own scraped metadata.
+    return item.copyWith(
+      name: item.name.trim().isEmpty ? _str(doc['title']) : null,
+      overview: (item.overview?.trim().isEmpty ?? true) ? _str(doc['overview']) : null,
+      genres: item.genres.isEmpty ? [for (final g in (doc['genres'] as List? ?? const [])) if (g is String) g] : null,
+      localizedPosterPath: hasPoster ? null : _str(doc['poster']),
+      localizedLogoPath: item.logoImageTag == null && item.parentLogoImageTag == null ? _str(doc['logo']) : null,
+      localizedBackdropPath: hasBackdrop ? null : _str(doc['backdrop']),
+      localizedCollectionId: collection?['id'] as int?,
+      localizedCollectionName: _str(collection?['name']),
+    );
+  }
+
+  Future<EmbyItem> _fillCast(EmbyItem item, String path) async {
+    final doc = await _doc('fill/$path/credits', () async {
+      final j = await _tmdb.get('/$path/credits', language: language);
+      if (j == null) return null;
+      return <String, dynamic>{
+        'cast': [
+          for (final c in (j['cast'] as List? ?? const []))
+            if (c is Map && c['name'] is String)
+              <String, dynamic>{
+                'id': c['id'],
+                'name': c['name'],
+                'role': c['character'],
+                'photo': c['profile_path'],
+              },
+        ],
+      };
+    });
+    final cast = doc?['cast'] as List? ?? const [];
+    if (cast.isEmpty) return item;
+    return item.copyWith(people: [
+      for (final c in cast)
+        if (c is Map)
+          Person(
+            id: 'tmdb:${c['id'] ?? c['name']}',
+            name: _str(c['name']) ?? '',
+            role: _str(c['role']),
+            type: 'Actor',
+            localizedImagePath: _str(c['photo']),
+          ),
+    ]);
   }
 
   Future<TmdbCollectionInfo?> collection(int id) async {

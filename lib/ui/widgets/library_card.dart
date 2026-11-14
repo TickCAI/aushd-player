@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 
 import '../../app/app_services.dart';
@@ -6,19 +8,26 @@ import '../../l10n/l10n.dart';
 import '../focus/tv_focusable.dart';
 import '../theme/tokens.dart';
 import 'common.dart';
+import 'mixed_cards.dart' show spotlightWidth;
 import 'net_image.dart';
 
-/// A wide 16:9 tile for a real Emby/Jellyfin library (a `CollectionFolder`).
+/// Library tiles use the same 640x360 spotlight size as "Recommended for you".
+/// A 380-wide landscape card made a server library look like a shrunken poster
+/// and cut off the library name.
+const double libraryCardWidth = spotlightWidth;
+
+/// A wide tile for a real Emby/Jellyfin library (a `CollectionFolder`).
 ///
-/// Library artwork is read straight from the server. It deliberately does NOT
-/// go through the movie artwork pipeline, because localized TMDB posters would
-/// otherwise be pasted onto a library tile, and `ImageTags.Primary` is often an
-/// auto-generated collage of unrelated movie posters.
+/// Artwork comes straight from the server: a real backdrop from an item inside
+/// the library is preferred, because `ImageTags.Primary` is usually an
+/// auto-generated tall collage of movie posters. Whatever the source, the image
+/// is shown *uncropped* (`BoxFit.contain`) over a blurred copy of itself, so a
+/// vertical cover never has its titles sliced off by a 16:9 crop.
 class LibraryCard extends StatelessWidget {
   const LibraryCard({
     super.key,
     required this.view,
-    this.width = Zs.landscapeWidth,
+    this.width = libraryCardWidth,
     this.autofocus = false,
     this.onFocus,
     this.onSelect,
@@ -50,20 +59,13 @@ class LibraryCard extends StatelessWidget {
     final catalog = AppServicesScope.read(context).catalog;
     final l10n = context.l10n;
     final height = width * 9 / 16;
-    final pixels = (width * 1.5).round();
-
-    Uri? cover;
-    if (view.backdropImageTags.isNotEmpty) {
-      cover = catalog.image(view.id, ImageKind.backdrop, tag: view.backdropImageTags.first, width: pixels);
-    } else if (view.thumbImageTag != null) {
-      cover = catalog.image(view.id, ImageKind.thumb, tag: view.thumbImageTag, width: pixels);
-    } else if (view.imageTag != null) {
-      cover = catalog.image(view.id, ImageKind.primary, tag: view.imageTag, width: pixels);
-    }
+    final cover = catalog.libraryArtwork(view, width: (width * 1.6).round());
     final logo = view.logoImageTag == null
         ? null
-        : catalog.image(view.id, ImageKind.logo, tag: view.logoImageTag, width: 400);
+        : catalog.image(view.id, ImageKind.logo, tag: view.logoImageTag, width: 500);
     final count = view.itemCount;
+    final overview = view.overview?.trim();
+    final titleText = Text(view.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: Zt.title);
 
     return TvFocusable(
       autofocus: autofocus,
@@ -71,73 +73,85 @@ class LibraryCard extends StatelessWidget {
       onFocusChange: (focused) {
         if (focused) onFocus?.call();
       },
-      builder: (context, focused) => SizedBox(
-        width: width,
-        child: FocusFrame(
-          focused: focused,
-          scale: 1.035,
-          radius: Zs.radiusLarge,
-          child: SizedBox(
-            width: width,
-            height: height,
-            child: Stack(fit: StackFit.expand, children: [
-              NetImage(
-                url: cover,
-                width: width,
-                height: height,
-                fit: BoxFit.cover,
-                fallback: TitleArt(title: view.name, icon: Icons.video_library_outlined),
+      builder: (context, focused) => FocusFrame(
+        focused: focused,
+        scale: 1.04,
+        radius: Zs.radiusLarge,
+        child: SizedBox(
+          width: width,
+          height: height,
+          child: Stack(fit: StackFit.expand, children: [
+            if (cover != null) ...[
+              // Blurred, full-bleed underlay fills the letterbox when the
+              // server only has a tall poster collage.
+              ImageFiltered(
+                imageFilter: ui.ImageFilter.blur(sigmaX: 32, sigmaY: 32),
+                child: NetImage(url: cover, width: width, height: height, fit: BoxFit.cover),
               ),
-              const DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Color(0x11000000), Color(0x33000000), Color(0xE6000000)],
-                    stops: [0.0, 0.45, 1.0],
-                  ),
+              const DecoratedBox(decoration: BoxDecoration(color: Color(0x59000000))),
+            ],
+            // The actual artwork, complete and uncropped.
+            NetImage(
+              url: cover,
+              width: width,
+              height: height,
+              fit: BoxFit.contain,
+              fallback: TitleArt(title: view.name, icon: Icons.video_library_outlined),
+            ),
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [Color(0xF0000000), Color(0x99000000), Color(0x00000000)],
+                  stops: [0.0, 0.45, 0.85],
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (logo != null)
-                      SizedBox(
-                        height: 46,
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(26, 26, 26, 22),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  if (logo != null)
+                    SizedBox(
+                      height: 76,
+                      width: width * 0.55,
+                      child: NetImage(
+                        url: logo,
                         width: width * 0.55,
-                        child: NetImage(
-                          url: logo,
-                          width: width * 0.55,
-                          fit: BoxFit.contain,
-                          alignment: Alignment.topLeft,
-                          fallback: const SizedBox.shrink(),
-                        ),
+                        fit: BoxFit.contain,
+                        alignment: Alignment.bottomLeft,
+                        fallback: titleText,
                       ),
-                    const Spacer(),
+                    )
+                  else
+                    titleText,
+                  const SizedBox(height: 10),
+                  MetaLine(
+                    [typeLabel(view.collectionType, l10n), if (count != null && count > 0) l10n.filmCount(count)],
+                    style: Zt.caption.copyWith(color: Zc.textMuted),
+                  ),
+                  if (overview != null && overview.isNotEmpty) ...[
+                    const SizedBox(height: 8),
                     Text(
-                      view.name,
+                      overview,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: Zt.label.copyWith(fontSize: 25, fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 6),
-                    MetaLine(
-                      [typeLabel(view.collectionType, l10n), if (count != null && count > 0) l10n.filmCount(count)],
-                      style: Zt.caption.copyWith(fontSize: 17, color: Zc.textMuted),
+                      style: Zt.caption.copyWith(color: Zc.textMuted, height: 1.35),
                     ),
                   ],
-                ),
+                ],
               ),
-              if (focused)
-                Positioned(
-                  top: 14,
-                  right: 14,
-                  child: Pill(ContentZh.enabled ? '进入' : 'Open', icon: Icons.arrow_forward_rounded, color: Zc.accent),
-                ),
-            ]),
-          ),
+            ),
+            if (focused)
+              Positioned(
+                top: 14,
+                right: 14,
+                child: Pill(ContentZh.enabled ? '进入' : 'Open', icon: Icons.arrow_forward_rounded, color: Zc.accent),
+              ),
+          ]),
         ),
       ),
     );

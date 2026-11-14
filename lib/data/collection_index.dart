@@ -81,43 +81,22 @@ final class CollectionIndex {
   Future<List<LibraryCollection>> _build() async {
     final movies = await _movies();
     final byCollection = <int, List<MovieRef>>{};
-    var done = 0;
     final watch = Stopwatch()..start();
-    // A whole-library TMDB sweep once queued ~19k requests on a 6-slot gate
-    // shared with the UI, starving detail pages and playback. Server-side
-    // collection hints and the localizer's own doc cache cover the bulk of the
-    // library; only a bounded, chunked set is probed online so the gate always
-    // has room for what the user is actually looking at.
-    const maxLookups = 240;
-    const chunkSize = 12;
+    // Only server-side collection hints. Probing every movie online once
+    // queued thousands of TMDB requests behind the UI's shared gate; that
+    // whole-library sweep is intentionally gone.
     for (final m in movies) {
       final hint = m.collectionHint;
       if (hint != null) (byCollection[hint] ??= []).add(m);
     }
-    final toProbe = [for (final m in movies) if (m.collectionHint == null && m.tmdbId != null) m];
-    var lookups = 0;
-    for (var i = 0; i < toProbe.length && lookups < maxLookups; i += chunkSize) {
-      if (watch.elapsed > const Duration(seconds: 25)) break;
-      final chunk = toProbe.skip(i).take(chunkSize).toList();
-      lookups += chunk.length;
-      await Future.wait(chunk.map((m) async {
-        int? cid;
-        try {
-          cid = await _tmdb.movieCollectionId(m.tmdbId!).timeout(const Duration(seconds: 6));
-        } catch (_) {}
-        if (cid != null) (byCollection[cid] ??= []).add(m);
-        done++;
-      }));
-      progress.value = movies.isEmpty ? null : done / movies.length;
-    }
-    final collections = await Future.wait(byCollection.entries.take(120).map((e) async {
+    final collections = await Future.wait(byCollection.entries.take(24).map((e) async {
       final info = await _tmdb.collection(e.key).timeout(const Duration(seconds: 6), onTimeout: () => null);
       if (info == null || info.parts.length < 2) return null;
       final added = [for (final m in e.value) ?m.added]..sort();
       return LibraryCollection(info: info, ownedIds: [for (final m in e.value) m.id], lastAdded: added.lastOrNull);
     }));
     progress.value = null;
-    debugPrint('[collections] ${movies.length} movies ($lookups probed) -> ${byCollection.length} collections '
+    debugPrint('[collections] ${movies.length} movies -> ${byCollection.length} server-hinted collections '
         'in ${watch.elapsedMilliseconds} ms');
     return collections.nonNulls.toList()..sort((a, b) => _sortKey(a.info.name).compareTo(_sortKey(b.info.name)));
   }

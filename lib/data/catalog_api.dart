@@ -5,6 +5,18 @@ import '../services/janus/janus_service.dart';
 import 'collection_index.dart';
 import 'metadata_localizer.dart';
 
+/// Points at a real landscape image that belongs to an item inside a library.
+/// Emby's auto-generated library `Primary`/`Thumb` is a tall poster collage;
+/// cropping that into a 16:9 tile cuts off every title, so we pick a genuine
+/// backdrop from the library's own content instead.
+final class LibraryArtworkRef {
+  const LibraryArtworkRef(this.itemId, this.kind, this.tag);
+
+  final String itemId;
+  final ImageKind kind;
+  final String? tag;
+}
+
 final class LibraryView {
   const LibraryView({
     required this.id,
@@ -15,6 +27,8 @@ final class LibraryView {
     this.logoImageTag,
     this.backdropImageTags = const [],
     this.itemCount,
+    this.featuredArtwork,
+    this.overview,
   });
 
   final String id;
@@ -26,13 +40,20 @@ final class LibraryView {
   /// custom library artwork was uploaded, so this is only a last resort.
   final String? imageTag;
 
-  /// Clean landscape artwork, preferred for library tiles.
   final String? thumbImageTag;
   final String? logoImageTag;
   final List<String> backdropImageTags;
   final int? itemCount;
 
-  LibraryView copyWith({int? itemCount}) => LibraryView(
+  /// A landscape still taken from one of the items in this library.
+  final LibraryArtworkRef? featuredArtwork;
+  final String? overview;
+
+  LibraryView copyWith({
+    int? itemCount,
+    LibraryArtworkRef? featuredArtwork,
+  }) =>
+      LibraryView(
         id: id,
         name: name,
         collectionType: collectionType,
@@ -41,6 +62,8 @@ final class LibraryView {
         logoImageTag: logoImageTag,
         backdropImageTags: backdropImageTags,
         itemCount: itemCount ?? this.itemCount,
+        featuredArtwork: featuredArtwork ?? this.featuredArtwork,
+        overview: overview,
       );
 }
 
@@ -77,9 +100,13 @@ final class CatalogApi {
     'EnableUserData': 'true',
   };
 
+  /// Home page tiles are rebuilt on every navigation; keep the enriched view
+  /// list for a few minutes instead of issuing one query per library each time.
+  ({DateTime at, List<LibraryView> data})? _enrichedViews;
+
   Future<List<LibraryView>> views() async {
     final json = await _janus.client.getJson('/Users/$_userId/Views', queryParameters: {
-      'Fields': 'ChildCount,RecursiveItemCount,PrimaryImageAspectRatio',
+      'Fields': 'ChildCount,RecursiveItemCount,PrimaryImageAspectRatio,Overview',
       ..._imageArgs,
     });
     return [
@@ -96,28 +123,84 @@ final class CatalogApi {
               for (final t in (raw['BackdropImageTags'] as List? ?? const [])) if (t is String) t,
             ],
             itemCount: (raw['RecursiveItemCount'] as num?)?.toInt() ?? (raw['ChildCount'] as num?)?.toInt(),
+            overview: raw['Overview'] as String?,
           ),
     ];
+  }
+
+  /// One pass per library returns both the authoritative item count and a
+  /// real landscape still to use as the tile artwork.
+  Future<List<LibraryView>> viewsWithCounts() async {
+    final cached = _enrichedViews;
+    if (cached != null && DateTime.now().difference(cached.at) < const Duration(minutes: 5)) {
+      return cached.data;
+    }
+    final views = await this.views();
+    if (views.isEmpty) return views;
+    final enriched = await Future.wait([
+      for (final v in views.take(12)) _enrichView(v),
+    ]);
+    _enrichedViews = (at: DateTime.now(), data: enriched);
+    return enriched;
+  }
+
+  Future<LibraryView> _enrichView(LibraryView v) async {
+    ItemPage page;
+    try {
+      page = await query(parentId: v.id, limit: 12, sortBy: 'DateCreated', descending: true, localize: false)
+          .timeout(const Duration(seconds: 4));
+    } catch (_) {
+      // Some servers reject DateCreated as a sort field. A plain name-ordered
+      // query still gives us artwork, and /Views already has the real count.
+      try {
+        page = await query(parentId: v.id, limit: 12, localize: false).timeout(const Duration(seconds: 4));
+      } catch (_) {
+        return v;
+      }
+    }
+    // `TotalRecordCount` is capped by Limit on a few Emby/Jellyfin builds (it
+    // used to make every library read "1 部"), while RecursiveItemCount from
+    // /Views is the authoritative number. Never let the smaller value win.
+    final count = bestLibraryCount(v.itemCount, page.total > 0 ? page.total : null);
+    return v.copyWith(itemCount: count, featuredArtwork: _featuredArtwork(page.items) ?? v.featuredArtwork);
+  }
+
+  /// Kept pure so the "every library shows 1 film" regression stays covered by
+  /// a unit test without a live server.
+  static int? bestLibraryCount(int? fromViews, int? fromQuery) {
+    if (fromViews == null) return fromQuery;
+    if (fromQuery == null) return fromViews;
+    return fromViews > fromQuery ? fromViews : fromQuery;
+  }
+
+  static LibraryArtworkRef? _featuredArtwork(List<EmbyItem> items) {
+    for (final item in items) {
+      if (item.backdropImageTags.isNotEmpty) {
+        return LibraryArtworkRef(item.id, ImageKind.backdrop, item.backdropImageTags.first);
+      }
+    }
+    for (final item in items) {
+      if (item.thumbImageTag != null) return LibraryArtworkRef(item.id, ImageKind.thumb, item.thumbImageTag);
+    }
+    return null;
+  }
+
+  /// Shared by the home shelf and the rail so both show the same artwork.
+  Uri? libraryArtwork(LibraryView v, {int width = 960}) {
+    if (v.backdropImageTags.isNotEmpty) {
+      return image(v.id, ImageKind.backdrop, tag: v.backdropImageTags.first, width: width);
+    }
+    final featured = v.featuredArtwork;
+    if (featured != null) return image(featured.itemId, featured.kind, tag: featured.tag, width: width);
+    if (v.thumbImageTag != null) return image(v.id, ImageKind.thumb, tag: v.thumbImageTag, width: width);
+    if (v.imageTag != null) return image(v.id, ImageKind.primary, tag: v.imageTag, width: width);
+    return null;
   }
 
   static String? _tag(Map raw, String kind) {
     final tags = raw['ImageTags'];
     final value = tags is Map ? tags[kind] : null;
     return value is String && value.isNotEmpty ? value : null;
-  }
-
-  /// Adds an accurate item count for each library. Every request is bounded so
-  /// a slow server cannot stall the home page's first frame.
-  Future<List<LibraryView>> viewsWithCounts() async {
-    final views = await this.views();
-    if (views.isEmpty) return views;
-    return await Future.wait([
-      for (final v in views.take(12))
-        query(parentId: v.id, limit: 1, localize: false)
-            .then((page) => v.copyWith(itemCount: page.total))
-            .timeout(const Duration(seconds: 3), onTimeout: () => v)
-            .catchError((Object _) => v),
-    ]);
   }
 
   Future<List<EmbyItem>> resume({int limit = 24}) => _list('/Users/$_userId/Items/Resume', {
@@ -292,10 +375,9 @@ final class CatalogApi {
     return out;
   }
 
-  /// Detail lookups must never wait on TMDB: People / MediaSources /
-  /// MediaStreams come straight from the server. Callers that want localized
-  /// artwork can opt in with [localizeMetadata].
-  Future<EmbyItem> item(String id, {bool localizeMetadata = true}) async {
+  /// The server already holds the user's own scrape. TMDB is never consulted
+  /// for a plain item lookup; a detail page opts into gap filling via [localize].
+  Future<EmbyItem> item(String id, {bool localizeMetadata = false}) async {
     final json = await _janus.client.getJson('/Users/$_userId/Items/$id', queryParameters: {
       'Fields': detailFields,
       ..._imageArgs,
@@ -515,9 +597,13 @@ final class CatalogApi {
     return _localize(_parse(json));
   }
 
-  Future<EmbyItem> localize(EmbyItem item) async => await localizer?.localize(item) ?? item;
+  /// On-demand gap filling for one opened title. Lists never call this.
+  Future<EmbyItem> localize(EmbyItem item) async => await localizer?.fillMissing(item) ?? item;
 
-  Future<List<EmbyItem>> _localize(List<EmbyItem> items) async => await localizer?.localizeAll(items) ?? items;
+  /// Home page / library / search / recommendation lists render the server's
+  /// own scraped metadata. Keeping this a no-op prevents the TMDB request
+  /// storms that used to starve detail pages and playback.
+  Future<List<EmbyItem>> _localize(List<EmbyItem> items) => Future.value(items);
 
   static List<EmbyItem> _parse(Map<String, dynamic> json) => [
         for (final raw in (json['Items'] as List? ?? const []))

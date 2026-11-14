@@ -109,6 +109,12 @@ class _SeriesPageState extends State<SeriesPage> {
         _error = null;
         _episodes.clear();
       });
+      // Same on-demand gap filling as a movie detail page, capped at one item.
+      c.localize(series).timeout(const Duration(seconds: 8)).then((filled) {
+        if (mounted && !identical(_series, filled) && filled.id == widget.seriesId) {
+          setState(() => _series = filled);
+        }
+      }).catchError((Object _) {});
       if (focusSeason != null) await _loadEpisodes(focusSeason);
       if (!mounted) return;
       WidgetsBinding.instance.addPostFrameCallback((_) {

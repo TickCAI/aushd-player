@@ -280,7 +280,7 @@ class _HomePageState extends State<HomePage> {
 
     return [
       _Row((l) => l.continueWatching, () => c.continueWatching(), kind: _Kind.continueWatching, recommends: false),
-      _Row((l) => l.myLibraries, () => _libraryTiles(s), kind: _Kind.libraries, recommends: false),
+      _Row((l) => l.myLibraries, () => _libraryTiles(s), kind: _Kind.libraries, style: CardStyle.spotlight, recommends: false),
       for (final (id, name) in _collections(s))
         _Row((l) => name,
             () => items(c.query(parentId: id, recursive: false, sortBy: 'PremiereDate,ProductionYear,SortName', limit: 100)),
@@ -336,7 +336,7 @@ class _HomePageState extends State<HomePage> {
     return row = _Row((l) => '', () async {
       final seeds = pick(await _profile(s));
       if (seeds.length <= index) return const [];
-      final seed = await s.catalog.localize(seeds[index]);
+      final seed = seeds[index];
       row.title = (l) => l.becauseYouWatched(seed.name);
       final seerr = s.seerr;
       final tmdbId = seed.tmdbId;
@@ -658,7 +658,6 @@ class _HomePageState extends State<HomePage> {
         final (cardW, areaH) = switch (row.kind) {
           _Kind.collections => (560.0, 560 * 0.42 + 44),
           _Kind.continueWatching => (Zs.landscapeWidth, cardAreaHeight(CardStyle.landscape)),
-          _Kind.libraries => (Zs.landscapeWidth, cardAreaHeight(CardStyle.landscape)),
           _ => (cardWidth(row.style), cardAreaHeight(row.style)),
         };
         if (snap.data == null && !snap.hasError) {
@@ -697,7 +696,7 @@ class _HomePageState extends State<HomePage> {
     if (data is LibraryView) {
       return LibraryCard(
         view: data,
-        width: Zs.landscapeWidth,
+        width: libraryCardWidth,
         autofocus: autofocus,
         onFocus: () => _focusData(data),
         onSelect: () => widget.onOpenLibraryView?.call(data),
