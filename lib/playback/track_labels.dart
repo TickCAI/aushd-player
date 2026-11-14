@@ -1,10 +1,12 @@
 import '../core/emby/models/media_source.dart';
 import '../l10n/app_localizations.dart';
+import '../l10n/content_zh.dart';
 import 'language.dart';
 
 abstract final class TrackLabels {
   static String title(MediaStream s, L10n l10n) {
-    final lang = s.displayLanguage ?? _languageName(s.language);
+    final raw = s.displayLanguage ?? _languageName(s.language);
+    final lang = raw == null ? null : ContentZh.language(raw);
     if (lang != null && lang.isNotEmpty) return lang;
     if (s.title != null && s.title!.isNotEmpty) return s.title!;
     return l10n.trackNumber(s.index);
@@ -57,6 +59,17 @@ abstract final class TrackLabels {
   static String? channels(MediaStream s) {
     final n = s.channels;
     if (n == null || n <= 0) return null;
+    if (ContentZh.enabled) {
+      return switch (n) {
+        1 => '单声道',
+        2 => '立体声',
+        3 => '2.1 声道',
+        6 => '5.1 声道',
+        7 => '6.1 声道',
+        8 => '7.1 声道',
+        _ => '$n 声道',
+      };
+    }
     return switch (n) {
       1 => 'Mono',
       2 => 'Stereo',

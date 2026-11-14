@@ -384,7 +384,7 @@ class _ShellState extends State<Shell> {
   }
 
   Widget _page(ShellTab t) => switch (t) {
-    ShellTab.home => const HomePage(),
+    ShellTab.home => HomePage(onOpenLibraryView: _selectLibraryView),
     ShellTab.search => const SearchPage(),
     ShellTab.movies => LibraryPage(
         kind: LibraryKind.movies,

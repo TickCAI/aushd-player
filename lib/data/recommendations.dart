@@ -39,7 +39,7 @@ extension RecommendationItemFilter on Object {
 typedef MixedItems = List<Object>;
 
 final class Recommender {
-  Recommender({required this.catalog, required this.seerr, this.tmdb, this.language = 'en-US'});
+  Recommender({required this.catalog, required this.seerr, this.tmdb, this.language = TmdbApi.defaultLanguage});
 
   final CatalogApi catalog;
   final SeerrApi? seerr;

@@ -1,5 +1,11 @@
 {
   "@@locale": "zh",
+  "myLibraries": "我的媒体库",
+  "gpuApi": "图形接口",
+  "gpuApiHint": "默认 D3D11。若全屏播放闪退（常见于 AMD 驱动），可改用 Vulkan 或 OpenGL 绕开；切换后建议把硬件加速设为自动。从下一次播放开始生效。",
+  "gpuApiD3d11": "D3D11（默认）",
+  "gpuApiVulkan": "Vulkan（全屏闪退时优先尝试）",
+  "gpuApiOpengl": "OpenGL / ANGLE",
   "notSet": "未设置",
   "save": "保存",
   "cancel": "取消",

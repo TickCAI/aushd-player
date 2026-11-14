@@ -417,9 +417,9 @@ class _LibraryPageState extends State<LibraryPage> {
                         ),
                         const SizedBox(width: 14),
                         TvButton(
-                          label: _genre ?? l10n.allGenres,
+                          label: _genre == null ? l10n.allGenres : ContentZh.genre(_genre!),
                           icon: Icons.category_outlined,
-                          onSelect: () => _pick<String>(l10n.genre, {'': l10n.allGenres, for (final g in _genres) g: g}, _genre ?? '',
+                          onSelect: () => _pick<String>(l10n.genre, {'': l10n.allGenres, for (final g in _genres) g: ContentZh.genre(g)}, _genre ?? '',
                               (v) => _genre = v.isEmpty ? null : v),
                         ),
                         if (widget.kind != LibraryKind.favorites) ...[

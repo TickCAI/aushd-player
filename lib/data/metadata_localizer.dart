@@ -31,7 +31,12 @@ final class TmdbCollectionInfo {
 }
 
 final class MetadataLocalizer {
-  MetadataLocalizer({required this._tmdb, required this.language, required this._seriesTmdbIds}) {
+  MetadataLocalizer({
+    required this._tmdb,
+    required this.language,
+    required this._seriesTmdbIds,
+    this.artworkOnly = false,
+  }) {
     keyRejected.value = false;
   }
 
@@ -39,6 +44,10 @@ final class MetadataLocalizer {
 
   final String language;
   final SeriesTmdbIds _seriesTmdbIds;
+
+  /// "Follow the server" mode: fetch localized artwork only, never replace
+  /// the titles/synopses the user's own scraper produced.
+  final bool artworkOnly;
 
   static final keyRejected = ValueNotifier<bool>(false);
 
@@ -51,7 +60,10 @@ final class MetadataLocalizer {
   String get _lang => language.split('-').first;
   bool get _english => _lang == 'en';
 
-  String get _imageLanguages => _english ? 'en,null' : '$_lang,en,null';
+  /// Ask TMDB for Chinese artwork first. `null` means text-free images,
+  /// which are preferable to English ones on a Chinese UI.
+  String get _imageLanguages =>
+      _english ? 'en,null' : [_lang, if (_lang != 'zh') 'zh', 'null', 'en'].join(',');
 
   Future<EmbyItem> localize(EmbyItem item) async => (await localizeAll([item])).first;
 
@@ -126,13 +138,13 @@ final class MetadataLocalizer {
           var out = item;
           if (season != null) {
             out = out.copyWith(
-              name: _str(season['title']),
-              overview: _str(season['overview']),
+              name: artworkOnly ? null : _str(season['title']),
+              overview: artworkOnly ? null : _str(season['overview']),
               localizedPosterPath: _str(season['poster']),
             );
           }
           return out.copyWith(
-            seriesName: _str(series?['title']),
+            seriesName: artworkOnly ? null : _str(series?['title']),
             localizedLogoPath: _str(series?['logo']),
             localizedBackdropPath: _str(series?['backdrop']),
           );
@@ -143,11 +155,11 @@ final class MetadataLocalizer {
           final (series, season) = await (_series(sid), _season(sid, s)).wait;
           final episode = (season?['episodes'] as Map?)?['$e'] as Map?;
           return item.copyWith(
-            name: _str(episode?['title']),
-            overview: _str(episode?['overview']),
+            name: artworkOnly ? null : _str(episode?['title']),
+            overview: artworkOnly ? null : _str(episode?['overview']),
             localizedStillPath: _str(episode?['still']),
-            seriesName: _str(series?['title']),
-            seasonName: _str(season?['title']),
+            seriesName: artworkOnly ? null : _str(series?['title']),
+            seasonName: artworkOnly ? null : _str(season?['title']),
             localizedPosterPath: _str(series?['poster']),
             localizedLogoPath: _str(series?['logo']),
             localizedBackdropPath: _str(series?['backdrop']),
@@ -163,6 +175,17 @@ final class MetadataLocalizer {
 
   EmbyItem _apply(EmbyItem item, Map<String, dynamic>? doc, {bool keepTagline = false}) {
     if (doc == null) return item;
+    if (artworkOnly) {
+      final collection = doc['collection'] is Map ? doc['collection'] as Map : null;
+      return item.copyWith(
+        localizedPosterPath: _str(doc['poster']),
+        localizedLogoPath: _str(doc['logo']),
+        localizedBackdropPath: _str(doc['backdrop']),
+        // Collection lookups are metadata-independent and must keep working.
+        localizedCollectionId: collection?['id'] as int?,
+        localizedCollectionName: _str(collection?['name']),
+      );
+    }
     final genres = [for (final g in (doc['genres'] as List? ?? const [])) if (g is String) g];
     final collection = doc['collection'] is Map ? doc['collection'] as Map : null;
     final tagline = doc['tagline'];
@@ -287,9 +310,11 @@ final class MetadataLocalizer {
     };
   }
 
-  List<String?> get _posterOrder => [_lang, if (!_english) 'en', null];
+  List<String?> get _posterOrder =>
+      _english ? const ['en', null] : [_lang, if (_lang != 'zh') 'zh', null, 'en'];
 
-  List<String?> get _backdropOrder => [null, _lang, if (!_english) 'en'];
+  List<String?> get _backdropOrder =>
+      _english ? const [null, 'en'] : [_lang, if (_lang != 'zh') 'zh', null, 'en'];
 
   static Map? _translation(Map<String, dynamic> j, String tag) {
     final t = j['translations'];

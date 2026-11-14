@@ -56,6 +56,7 @@ final class PlayerSettings {
     this.toneMapping = 'auto',
     this.deband = false,
     this.videoOutput = 'gpu-next',
+    this.gpuApi = 'd3d11',
     this.detailedLog = true,
     this.scopeScreen = 0,
     this.autoCrop = false,
@@ -113,6 +114,11 @@ final class PlayerSettings {
 
   final String videoOutput;
 
+  /// Windows graphics API used by mpv. `d3d11` is the old default; some AMD
+  /// drivers crash in that path during a fullscreen swapchain resize, so the
+  /// user can switch to Vulkan or OpenGL without replacing the mpv binary.
+  final String gpuApi;
+
   final bool detailedLog;
 
   final double scopeScreen;
@@ -169,6 +175,7 @@ final class PlayerSettings {
     String? toneMapping,
     bool? deband,
     String? videoOutput,
+    String? gpuApi,
     bool? detailedLog,
     double? scopeScreen,
     bool? autoCrop,
@@ -210,6 +217,7 @@ final class PlayerSettings {
       toneMapping: toneMapping ?? this.toneMapping,
       deband: deband ?? this.deband,
       videoOutput: videoOutput ?? this.videoOutput,
+      gpuApi: gpuApi ?? this.gpuApi,
       detailedLog: detailedLog ?? this.detailedLog,
       scopeScreen: scopeScreen ?? this.scopeScreen,
       autoCrop: autoCrop ?? this.autoCrop,
@@ -253,6 +261,7 @@ final class PlayerSettings {
         'toneMapping': toneMapping,
         'deband': deband,
         'vo': videoOutput,
+        'gpuApi': gpuApi,
         'detailedLog': detailedLog,
         'scope': scopeScreen,
         'autoCrop': autoCrop,
@@ -308,6 +317,7 @@ final class PlayerSettings {
       toneMapping: pick('toneMapping', d.toneMapping),
       deband: pick('deband', d.deband),
       videoOutput: pick('vo', d.videoOutput),
+      gpuApi: pick('gpuApi', d.gpuApi),
       detailedLog: pick('detailedLog', d.detailedLog),
       scopeScreen: pick('scope', d.scopeScreen),
       autoCrop: pick('autoCrop', d.autoCrop),

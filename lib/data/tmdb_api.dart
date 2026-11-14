@@ -29,6 +29,11 @@ final class TmdbProblem {
 }
 
 final class TmdbApi {
+  /// Domestic-first default. Callers that pass an explicit language still win;
+  /// every other request (search, discover, recommendations, collections)
+  /// gets Chinese titles, posters and collection names out of the box.
+  static const defaultLanguage = 'zh-CN';
+
   TmdbApi({required String apiKey, http.Client? client})
       : apiKey = apiKey.trim(),
         _http = client ?? LoggingHttpClient(tag: 'tmdb');
@@ -65,7 +70,7 @@ final class TmdbApi {
   Future<Map<String, dynamic>?> get(String path, {String? language, Map<String, String> query = const {}}) async {
     final params = {
       if (!_isToken) 'api_key': apiKey,
-      'language': ?language,
+      'language': language ?? defaultLanguage,
       ...query,
     };
     final headers = {

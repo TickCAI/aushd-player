@@ -528,7 +528,7 @@ class CollectionCard extends StatelessWidget {
           height: height,
           child: Stack(fit: StackFit.expand, children: [
             NetImage(
-              url: catalog.backdrop(item, width: (width * 1.5).round()) ?? catalog.landscape(item, width: width),
+              url: catalog.landscape(item, width: width) ?? catalog.backdrop(item, width: (width * 1.5).round()),
               width: width,
               fallback: TitleArt(title: '', icon: Icons.collections_bookmark_outlined),
             ),

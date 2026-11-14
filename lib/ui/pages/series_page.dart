@@ -239,7 +239,7 @@ class _SeriesPageState extends State<SeriesPage> {
                 _years(l10n, series),
                 l10n.seasonCount(_seasons.where((s) => (s.indexNumber ?? 1) > 0).length),
                 series.officialRating,
-                if (series.genres.isNotEmpty) series.genres.take(3).join(', '),
+                if (series.genres.isNotEmpty) ContentZh.genres(series.genres.take(3)),
               ],
             ),
           ),

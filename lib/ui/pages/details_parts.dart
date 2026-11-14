@@ -137,7 +137,7 @@ class CastRow extends StatelessWidget {
               const SizedBox(height: 14),
               Text(p.name, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center,
                   style: Zt.label.copyWith(fontSize: 19, color: focused ? Zc.text : Zc.textMuted)),
-              Text(p.type == 'Director' ? context.l10n.director : (p.role ?? ''), maxLines: 1, overflow: TextOverflow.ellipsis,
+              Text(p.type == 'Director' ? context.l10n.director : ContentZh.personRole(p.role ?? ''), maxLines: 1, overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center, style: Zt.caption.copyWith(fontSize: 16)),
             ]),
           ),
@@ -362,10 +362,10 @@ class _CollectionHighlightState extends State<CollectionHighlight> {
                       height: 96,
                       width: 520,
                       child: NetImage(url: logo, width: 520, fit: BoxFit.contain, alignment: Alignment.bottomLeft,
-                          fallback: Text(c.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: Zt.headline)),
+                          fallback: Text(ContentZh.collectionName(c.name), maxLines: 2, overflow: TextOverflow.ellipsis, style: Zt.headline)),
                     )
                   else
-                    Text(c.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: Zt.headline),
+                    Text(ContentZh.collectionName(c.name), maxLines: 2, overflow: TextOverflow.ellipsis, style: Zt.headline),
                   const SizedBox(height: 14),
                   MetaLine([size, _years]),
                   const SizedBox(height: 26),

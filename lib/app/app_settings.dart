@@ -10,7 +10,7 @@ import 'release.dart';
 const uiLanguages = {'zh': '简体中文', 'en': 'English', 'ro': 'Română', 'fr': 'Français', 'de': 'Deutsch', 'es': 'Español', 'pl': 'Polski'};
 
 const metadataLanguages = {
-  '': 'From the server (Emby)',
+  '': '跟随服务器（Emby）',
   'en-US': 'English',
   'ro-RO': 'Română',
   'fr-FR': 'Français',
@@ -139,13 +139,18 @@ final class AppSettings {
   String get resolvedUiLanguage {
     if (uiLanguages.containsKey(uiLanguage)) return uiLanguage;
     final system = PlatformDispatcher.instance.locale.languageCode;
-    return uiLanguages.containsKey(system) ? system : 'en';
+    // The product is primarily used in mainland China: when the OS locale is
+    // outside our supported set, fall back to Chinese rather than English.
+    return uiLanguages.containsKey(system) ? system : 'zh';
   }
 
   String get uiMetadataLanguage =>
       const {'zh': 'zh-CN', 'ro': 'ro-RO', 'fr': 'fr-FR', 'de': 'de-DE', 'es': 'es-ES', 'pl': 'pl-PL'}[resolvedUiLanguage] ?? 'en-US';
 
-  String get tmdbLanguage => metadataLanguage.isEmpty ? 'en-US' : metadataLanguage;
+  /// Even when metadata is set to "follow the server", artwork/title lookups
+  /// done through TMDB (discover, recommendations, collections) stay Chinese.
+  /// `tmdbMetadataEnabled` still controls whether server metadata is replaced.
+  String get tmdbLanguage => metadataLanguage.isEmpty ? 'zh-CN' : metadataLanguage;
 
   bool get tmdbMetadataEnabled => tmdbApiKey.trim().isNotEmpty && metadataLanguage.isNotEmpty;
 

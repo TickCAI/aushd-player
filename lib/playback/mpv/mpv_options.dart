@@ -44,9 +44,16 @@ Map<String, String> buildMpvOptions({
     'idle': 'yes',
 
     'vo': linux ? 'libmpv' : (own ? settings.videoOutput : 'gpu-next'),
-    if (!linux) 'gpu-api': 'd3d11',
+    // Windows default used to be hard-coded to d3d11. Some AMD drivers crash
+    // inside amdxx64.dll when a D3D11 swapchain is resized by fullscreen, so
+    // the graphics API is now user-selectable (Vulkan / OpenGL are compiled
+    // into the bundled libmpv). D3D11 hardware decoding is tied to that API,
+    // so fall back to mpv's safe automatic decoder on the other backends.
+    if (!linux) 'gpu-api': settings.gpuApi,
     if (own) ...{
-      'hwdec': linux && settings.hwdec.startsWith('d3d11') ? 'auto-safe' : settings.hwdec,
+      'hwdec': settings.hwdec.startsWith('d3d11') && (linux || settings.gpuApi != 'd3d11')
+          ? 'auto-safe'
+          : settings.hwdec,
       if (!linux) 'target-colorspace-hint': settings.hdrPassthrough ? 'yes' : 'no',
       'video-sync': !settings.smoothMotion ? 'audio' : (bitstream ? 'display-vdrop' : 'display-resample'),
       'interpolation': settings.smoothMotion ? 'yes' : 'no',

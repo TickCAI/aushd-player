@@ -80,9 +80,9 @@ Widget mixedCard(
         meta: [
           ?item.productionYear?.toString(),
           if ((item.communityRating ?? 0) > 0) '★ ${item.communityRating!.toStringAsFixed(1)}',
-          ?item.genres.firstOrNull,
+          if (item.genres.isNotEmpty) ContentZh.genre(item.genres.first),
         ].join('  ·  '),
-        backdrop: services.catalog.backdrop(item, width: wide) ?? services.catalog.landscape(item, width: wide.toDouble()),
+        backdrop: services.catalog.landscape(item, width: wide.toDouble()) ?? services.catalog.backdrop(item, width: wide),
         logo: services.catalog.logo(item),
         onSelect: () => openItem(context, item),
         child: card,
@@ -120,7 +120,7 @@ Widget _mixedCard(
         item: item,
         autofocus: autofocus,
         title: item.name,
-        subtitle: [item.productionYear?.toString(), item.genres.firstOrNull].nonNulls.join('  ·  '),
+        subtitle: [item.productionYear?.toString(), if (item.genres.isNotEmpty) ContentZh.genre(item.genres.first)].nonNulls.join('  ·  '),
         preferEpisodeStill: false,
         onFocus: onFocus,
         onSelect: open,
@@ -259,9 +259,9 @@ class SpotlightCard extends StatelessWidget {
     final c = AppServicesScope.read(context).catalog;
     return SpotlightCard(
       title: item.name,
-      backdrop: c.backdrop(item, width: 1280) ?? c.landscape(item, width: 1280),
+      backdrop: c.landscape(item, width: 1280) ?? c.backdrop(item, width: 1280),
       logo: c.logo(item, width: 500),
-      meta: [item.productionYear?.toString(), item.genres.take(2).join(', ')],
+      meta: [item.productionYear?.toString(), ContentZh.genres(item.genres.take(2))],
       overview: item.overview,
       autofocus: autofocus,
       onFocus: onFocus,
@@ -273,7 +273,7 @@ class SpotlightCard extends StatelessWidget {
       SpotlightCard(
         title: m.title,
         backdrop: m.backdrop() ?? m.poster(width: 780),
-        meta: [m.year?.toString(), m.genres.take(2).join(', ')],
+        meta: [m.year?.toString(), ContentZh.genres(m.genres.take(2))],
         overview: m.overview,
         media: m,
         autofocus: autofocus,

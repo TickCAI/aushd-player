@@ -49,7 +49,10 @@ class _Row {
 }
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  const HomePage({super.key, this.onOpenLibraryView});
+
+  /// Called when a server-library tile on the home page is activated.
+  final ValueChanged<LibraryView>? onOpenLibraryView;
 
   static final firstLoad = ValueNotifier(true);
 
@@ -264,6 +267,10 @@ class _HomePageState extends State<HomePage> {
 
     return [
       _Row((l) => l.continueWatching, () => c.continueWatching(), kind: _Kind.continueWatching, recommends: false),
+      _Row((l) => l.myLibraries, () async => <Object>[
+        for (final v in await c.views())
+          if (v.name.isNotEmpty) v,
+      ], style: CardStyle.poster, recommends: false),
       for (final (id, name) in _collections(s))
         _Row((l) => name,
             () => items(c.query(parentId: id, recursive: false, sortBy: 'PremiereDate,ProductionYear,SortName', limit: 100)),
@@ -412,7 +419,7 @@ class _HomePageState extends State<HomePage> {
       final genres = (await _profile(s)).genres;
       if (genres.length <= index) return const [];
       final genre = genres[index].genre;
-      row.title = (l) => l.moreGenre(lowerFirst(genre));
+      row.title = (l) => l.moreGenre(lowerFirst(ContentZh.genre(genre)));
       final page = await s.catalog.query(
           types: ['Movie', 'Series'], genres: [genre], filters: 'IsUnplayed', sortBy: 'Random', minCommunityRating: 6.5, limit: 30);
       return page.items;
@@ -429,7 +436,7 @@ class _HomePageState extends State<HomePage> {
       minCommunityRating: 7,
       limit: 12,
     );
-    return [for (final i in page.items) if (s.catalog.backdrop(i) != null) i];
+    return [for (final i in page.items) if (s.catalog.landscape(i) != null || s.catalog.backdrop(i) != null) i];
   }
 
   Future<MixedItems> _load(_Row row, {bool counted = false}) => _data.putIfAbsent(row, () async {
@@ -676,6 +683,17 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _card(_Row row, Object data, {required int rank, required bool autofocus}) {
+    if (data is LibraryView) {
+      // Use the server's own library cover as a poster tile; tapping it
+      // selects that view in the library page (same path as the rail).
+      return PosterCard(
+        item: EmbyItem(id: data.id, name: data.name, type: 'CollectionFolder', primaryImageTag: data.imageTag),
+        width: cardWidth(CardStyle.poster),
+        autofocus: autofocus,
+        onFocus: () => _focusData(data),
+        onSelect: () => widget.onOpenLibraryView?.call(data),
+      );
+    }
     if (row.kind == _Kind.collections && data is EmbyItem) {
       return CollectionCard(item: data, autofocus: autofocus, onFocus: () => _focusData(data), onSelect: () => openItem(context, data));
     }

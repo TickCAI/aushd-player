@@ -148,6 +148,9 @@ class _ZerkAppState extends State<ZerkApp> {
   Widget build(BuildContext context) {
     final services = AppServicesScope.of(context);
     final signedIn = services.isSignedIn;
+    // Content-level translations (genres, track languages, cast roles) follow
+    // the UI language chosen by the user.
+    ContentZh.uiLanguage = services.settings.resolvedUiLanguage;
     return MaterialApp(
       title: 'AusHD Player',
       debugShowCheckedModeBanner: false,

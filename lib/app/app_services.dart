@@ -313,7 +313,7 @@ final class AppServices extends ChangeNotifier {
     _seerr = SeerrApi(
       baseUrl: seerrBaseUrl(s.seerrUrl),
       apiKey: s.seerrApiKey.trim(),
-      language: s.tmdbMetadataEnabled ? s.metadataLanguage : null,
+      language: s.tmdbLanguage,
       embyUserId: () => janus.isAuthenticated ? janus.session.userId : null,
       embyToken: () => janus.isAuthenticated ? janus.session.accessToken : null,
     );
@@ -349,20 +349,23 @@ final class AppServices extends ChangeNotifier {
 
   void _rebuildMetadata() {
     final s = _settings;
-    final localizer = catalog.localizer = s.tmdbMetadataEnabled
-        ? MetadataLocalizer(
+    final localizer = catalog.localizer = s.tmdbApiKey.trim().isEmpty
+        ? null
+        : MetadataLocalizer(
             tmdb: TmdbApi(apiKey: s.tmdbApiKey),
-            language: s.metadataLanguage,
+            language: s.tmdbLanguage,
             seriesTmdbIds: catalog.seriesTmdbIds,
-          )
-        : null;
+            // "Follow the server" still gets Chinese artwork, but keeps the
+            // titles and synopses the user's own scraper produced.
+            artworkOnly: s.metadataLanguage.isEmpty,
+          );
     final key = s.tmdbApiKey.trim();
     catalog.collections = key.isEmpty
         ? null
         : CollectionIndex(
             movies: catalog.movieRefs,
             tmdb: localizer ??
-                MetadataLocalizer(tmdb: TmdbApi(apiKey: key), language: 'en-US', seriesTmdbIds: catalog.seriesTmdbIds),
+                MetadataLocalizer(tmdb: TmdbApi(apiKey: key), language: TmdbApi.defaultLanguage, seriesTmdbIds: catalog.seriesTmdbIds),
           );
   }
 }

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../core/emby/models/emby_item.dart';
+import '../l10n/content_zh.dart';
 import 'metadata_localizer.dart';
 
 typedef MovieRef = ({String id, int? tmdbId, int? collectionHint, DateTime? added});
@@ -64,7 +65,7 @@ final class CollectionIndex {
 
   static EmbyItem itemFor(TmdbCollectionInfo info, {required int owned, DateTime? added, DateTime? released}) => EmbyItem(
         id: '',
-        name: info.name,
+        name: ContentZh.collectionName(info.name),
         type: 'BoxSet',
         overview: info.overview,
         providerIds: {'Tmdb': '${info.id}'},

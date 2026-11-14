@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'app_localizations.dart';
 
 export 'app_localizations.dart';
+export 'content_zh.dart';
 export 'problems.dart';
 
 extension L10nContext on BuildContext {

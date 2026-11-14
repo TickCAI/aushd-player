@@ -843,13 +843,25 @@ class _AdvancedVideoPageState extends State<_AdvancedVideoPage> {
                 value: p.deband, onChanged: (v) => _save(p.copyWith(deband: v))),
             SettingToggleRow(title: l10n.smoothMotion, subtitle: l10n.smoothMotionHint,
                 value: p.smoothMotion, onChanged: (v) => _save(p.copyWith(smoothMotion: v))),
-            if (Host.isWindows)
+            if (Host.isWindows) ...[
               SettingChoiceRow<String>(
                 title: l10n.videoRenderer,
                 value: p.videoOutput,
                 options: {'gpu-next': l10n.videoRendererNext, 'gpu': l10n.videoRendererOld},
                 onChanged: (v) => _save(p.copyWith(videoOutput: v)),
               ),
+              SettingChoiceRow<String>(
+                title: l10n.gpuApi,
+                subtitle: l10n.gpuApiHint,
+                value: p.gpuApi,
+                options: {
+                  'd3d11': l10n.gpuApiD3d11,
+                  'vulkan': l10n.gpuApiVulkan,
+                  'opengl': l10n.gpuApiOpengl,
+                },
+                onChanged: (v) => _save(p.copyWith(gpuApi: v)),
+              ),
+            ],
             if (Host.isDesktop) ...[
               SettingHeader(l10n.displayTarget),
               _AdvancedIntro(l10n.displayTargetHint),

@@ -1,5 +1,11 @@
 {
   "@@locale": "en",
+  "myLibraries": "My libraries",
+  "gpuApi": "Graphics API",
+  "gpuApiHint": "D3D11 is the default. If fullscreen playback crashes on AMD drivers, try Vulkan or OpenGL. Applies from the next playback.",
+  "gpuApiD3d11": "D3D11 (default)",
+  "gpuApiVulkan": "Vulkan (use this if fullscreen crashes)",
+  "gpuApiOpengl": "OpenGL / ANGLE",
   "notSet": "Not set",
   "save": "Save",
   "cancel": "Cancel",

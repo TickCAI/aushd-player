@@ -7,6 +7,24 @@ import '../../core/log/logging_http_client.dart';
 import '../core/tv_scale.dart';
 import 'image_disk_cache.dart';
 
+/// A small URL-level backup registry for artwork.
+///
+/// Chinese TMDB artwork is preferred on a Chinese UI, but the CDN can fail on
+/// domestic networks. `Artwork` registers the user's own Emby/Jellyfin image as
+/// a backup for each localized URL, so a failed CDN request silently falls back
+/// instead of leaving an empty card. No widget needs to know about the backup.
+abstract final class ArtworkFallback {
+  static final Map<Uri, Uri> _byUrl = <Uri, Uri>{};
+
+  static Uri? of(Uri url) => _byUrl[url];
+
+  static void register(Uri primary, Uri? backup) {
+    if (backup == null || backup == primary) return;
+    if (_byUrl.length > 3000) _byUrl.clear();
+    _byUrl[primary] = backup;
+  }
+}
+
 @immutable
 class NetImageProvider extends ImageProvider<NetImageProvider> {
   const NetImageProvider(this.url, {this.decodeWidth});
@@ -39,13 +57,26 @@ class NetImageProvider extends ImageProvider<NetImageProvider> {
   }
 
   Future<Uint8List> _bytes() async {
-    final cached = await readCachedImage(url);
-    if (cached != null) return cached;
-    final res = await _client.get(url).timeout(const Duration(seconds: 20));
-    if (res.statusCode != 200 || res.bodyBytes.isEmpty) {
-      throw NetworkImageLoadException(statusCode: res.statusCode, uri: url);
+    try {
+      // Localized CDN images are preferred, but must not stall the UI for the
+      // full network timeout when the CDN is blocked; fall back quickly.
+      return await _fetch(url, timeout: const Duration(seconds: 8));
+    } catch (error) {
+      final backup = ArtworkFallback.of(url);
+      if (backup == null || backup == url) rethrow;
+      debugPrint('[image] fallback $url -> $backup ($error)');
+      return await _fetch(backup);
     }
-    writeCachedImage(url, res.bodyBytes);
+  }
+
+  Future<Uint8List> _fetch(Uri uri, {Duration timeout = const Duration(seconds: 20)}) async {
+    final cached = await readCachedImage(uri);
+    if (cached != null) return cached;
+    final res = await _client.get(uri).timeout(timeout);
+    if (res.statusCode != 200 || res.bodyBytes.isEmpty) {
+      throw NetworkImageLoadException(statusCode: res.statusCode, uri: uri);
+    }
+    writeCachedImage(uri, res.bodyBytes);
     return res.bodyBytes;
   }
 

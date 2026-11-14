@@ -236,7 +236,7 @@ class _RequestPageState extends State<RequestPage> {
                   Text(m.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: Zt.display),
                   const SizedBox(height: 14),
                   MetaLine(
-                    [m.year?.toString(), if (m.runtimeMinutes != null) formatRuntime(l10n, Duration(minutes: m.runtimeMinutes!)), if (m.genres.isNotEmpty) m.genres.take(3).join(', ')],
+                    [m.year?.toString(), if (m.runtimeMinutes != null) formatRuntime(l10n, Duration(minutes: m.runtimeMinutes!)), if (m.genres.isNotEmpty) ContentZh.genres(m.genres.take(3))],
                     leading: [if ((m.voteAverage ?? 0) > 0) RatingPill(m.voteAverage!)],
                     trailing: [CriticScores(tmdbId: m.tmdbId, tv: m.isTv)],
                   ),
