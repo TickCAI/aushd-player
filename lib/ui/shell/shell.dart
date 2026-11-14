@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/app_services.dart';
 import '../../core/log/app_log.dart';
+import '../../data/catalog_api.dart' as catalog;
 import '../../data/user_profile.dart';
 import '../../l10n/l10n.dart';
 import '../../playback/live_session.dart' show LiveShare;
@@ -31,6 +32,7 @@ import '../pages/settings_page.dart';
 import '../pages/together_page.dart';
 import '../theme/tokens.dart';
 import '../widgets/exit_app.dart';
+import '../widgets/net_image.dart';
 import '../widgets/profile_widgets.dart';
 import '../widgets/wall_clock.dart';
 import '../widgets/update_dialog.dart';
@@ -84,6 +86,11 @@ class Shell extends StatefulWidget {
 class _ShellState extends State<Shell> {
   late ShellTab _tab = widget.initialTab;
   late final _visited = <ShellTab>{widget.initialTab};
+
+  /// Server libraries shown in the rail instead of the built-in taxonomy.
+  List<catalog.LibraryView> _libraryViews = const [];
+  Map<String, Uri> _libraryCovers = const {};
+  catalog.LibraryView? _activeView;
   final _railZoneKey = GlobalKey();
   final _pageZoneKeys = {for (final t in ShellTab.values) t: GlobalKey()};
   bool _railFocused = false;
@@ -109,6 +116,38 @@ class _ShellState extends State<Shell> {
       _roomSub = _services.together.updates.listen(_onRoom);
       playbackActiveNotifier.addListener(_onPlayback);
       if (TvHome.supported) _watchTvHome();
+      _services.libraryChanged.addListener(_loadLibraryViews);
+      _loadLibraryViews();
+    }
+  }
+
+  Future<void> _loadLibraryViews() async {
+    final services = _services;
+    if (!services.isSignedIn) {
+      if (mounted) {
+        setState(() {
+          _libraryViews = const [];
+          _libraryCovers = const {};
+          _activeView = null;
+        });
+      }
+      return;
+    }
+    try {
+      final views = await services.catalog.views();
+      if (!mounted) return;
+      final list = [for (final v in views) if (v.name.isNotEmpty) v];
+      setState(() {
+        _libraryViews = list;
+        _libraryCovers = {
+          for (final v in list)
+            if (v.imageTag != null)
+              v.id: services.catalog.image(v.id, catalog.ImageKind.primary, tag: v.imageTag, width: 96),
+        };
+        if (_activeView != null && !list.any((v) => v.id == _activeView!.id)) _activeView = null;
+      });
+    } catch (e) {
+      debugPrint('[shell] library views: $e');
     }
   }
 
@@ -200,6 +239,7 @@ class _ShellState extends State<Shell> {
     unawaited(_roomSub?.cancel());
     playbackActiveNotifier.removeListener(_onPlayback);
     _services.libraryChanged.removeListener(_scheduleTvHome);
+    _services.libraryChanged.removeListener(_loadLibraryViews);
     _lifecycle?.dispose();
     _tvHomeTimer?.cancel();
     if (TvHome.supported && !_services.isSignedIn) unawaited(TvHome.clear());
@@ -230,6 +270,19 @@ class _ShellState extends State<Shell> {
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => ZoneNavigator.move(TraversalDirection.right),
     );
+  }
+
+  void _selectLibraryView(catalog.LibraryView view) {
+    AppLog.where = 'tab:library';
+    setState(() {
+      _activeView = view;
+      _tab = ShellTab.movies;
+      _visited.add(ShellTab.movies);
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AppLog.write('[nav] library ${view.name}');
+      ZoneNavigator.move(TraversalDirection.right);
+    });
   }
 
   bool _onBack() {
@@ -313,6 +366,10 @@ class _ShellState extends State<Shell> {
                           expanded: _railFocused && (!pointer || _railHovered),
                           onSelect: _select,
                           nodes: _railNodes,
+                          libraryViews: _libraryViews,
+                          libraryCovers: _libraryCovers,
+                          activeLibraryView: _activeView,
+                          onSelectLibraryView: _selectLibraryView,
                         ),
                       ),
                     ),
@@ -329,7 +386,11 @@ class _ShellState extends State<Shell> {
   Widget _page(ShellTab t) => switch (t) {
     ShellTab.home => const HomePage(),
     ShellTab.search => const SearchPage(),
-    ShellTab.movies => const LibraryPage(kind: LibraryKind.movies),
+    ShellTab.movies => LibraryPage(
+        kind: LibraryKind.movies,
+        view: _activeView,
+        onViewChanged: (v) => setState(() => _activeView = v),
+      ),
     ShellTab.shows => const LibraryPage(kind: LibraryKind.shows),
     ShellTab.favorites => const LibraryPage(kind: LibraryKind.favorites),
     ShellTab.collections => const CollectionsPage(),
@@ -377,10 +438,19 @@ class _Rail extends StatefulWidget {
     required this.expanded,
     required this.onSelect,
     required this.nodes,
+    required this.libraryViews,
+    required this.libraryCovers,
+    required this.activeLibraryView,
+    required this.onSelectLibraryView,
   });
 
   final Map<ShellTab, FocusNode> nodes;
   final List<ShellTab> tabs;
+
+  final List<catalog.LibraryView> libraryViews;
+  final Map<String, Uri> libraryCovers;
+  final catalog.LibraryView? activeLibraryView;
+  final ValueChanged<catalog.LibraryView> onSelectLibraryView;
 
   final UserProfile? profile;
   final ShellTab current;
@@ -393,15 +463,43 @@ class _Rail extends StatefulWidget {
 
 class _RailState extends State<_Rail> {
   final _groupNodes = {for (final g in _Group.values) g: FocusNode(debugLabel: 'rail-group:${g.name}')};
+  final _libraryNodes = <String, FocusNode>{};
 
   _Group? _focusGroup;
+
+  @override
+  void didUpdateWidget(covariant _Rail oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final ids = {for (final v in widget.libraryViews) v.id};
+    for (final key in _libraryNodes.keys.toList()) {
+      if (!ids.contains(key)) _libraryNodes.remove(key)?.dispose();
+    }
+  }
 
   @override
   void dispose() {
     for (final n in _groupNodes.values) {
       n.dispose();
     }
+    for (final n in _libraryNodes.values) {
+      n.dispose();
+    }
     super.dispose();
+  }
+
+  Widget _libraryItem(catalog.LibraryView view) {
+    final node = _libraryNodes.putIfAbsent(
+        view.id, () => FocusNode(debugLabel: 'rail-library:${view.id}'));
+    return _RailItem(
+      icon: Icons.video_library_outlined,
+      label: view.name,
+      imageUrl: widget.libraryCovers[view.id],
+      node: node,
+      selected: widget.activeLibraryView?.id == view.id && widget.current == ShellTab.movies,
+      expanded: widget.expanded,
+      child: true,
+      onSelect: () => widget.onSelectLibraryView(view),
+    );
   }
 
   bool _open(_Group g) =>
@@ -421,6 +519,7 @@ class _RailState extends State<_Rail> {
     final open = _open(g);
     final holdsCurrent = tabs.contains(widget.current);
     final focusable = open || (!widget.expanded && holdsCurrent);
+    final dynamicLibraries = g == _Group.library && widget.libraryViews.isNotEmpty;
     return Focus(
       canRequestFocus: false,
       skipTraversal: true,
@@ -439,7 +538,9 @@ class _RailState extends State<_Rail> {
           selected: holdsCurrent,
           expanded: widget.expanded,
           open: open,
-          onSelect: () => widget.onSelect(holdsCurrent ? widget.current : tabs.first),
+          onSelect: () => dynamicLibraries
+              ? widget.onSelectLibraryView(widget.activeLibraryView ?? widget.libraryViews.first)
+              : widget.onSelect(holdsCurrent ? widget.current : tabs.first),
         ),
         ClipRect(
           child: AnimatedAlign(
@@ -450,7 +551,18 @@ class _RailState extends State<_Rail> {
             child: ExcludeFocus(
               excluding: !focusable,
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                for (final t in tabs) _item(t, child: true),
+                if (dynamicLibraries)
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 300),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [for (final v in widget.libraryViews) _libraryItem(v)],
+                      ),
+                    ),
+                  )
+                else
+                  for (final t in tabs) _item(t, child: true),
               ]),
             ),
           ),
@@ -546,7 +658,10 @@ class _RailItem extends StatelessWidget {
     this.child = false,
     this.open,
     this.profile,
+    this.imageUrl,
   });
+
+  final Uri? imageUrl;
 
   final ShellTab? tab;
   final IconData? icon;
@@ -604,6 +719,16 @@ class _RailItem extends StatelessWidget {
                         maxWidth: 40,
                         child: UserAvatar(
                             url: profile!.avatarUrl, name: profile!.name, size: 40, ring: focused ? Zc.accent : null),
+                      ),
+                    )
+                  else if (imageUrl != null)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: NetImage(
+                        url: imageUrl,
+                        width: 28,
+                        height: 28,
+                        fallback: Icon(icon ?? tab!.icon, size: 24, color: fg),
                       ),
                     )
                   else

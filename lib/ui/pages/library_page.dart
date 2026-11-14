@@ -48,9 +48,15 @@ enum _Sort {
 enum _Watched { all, unwatched, watched, favorites }
 
 class LibraryPage extends StatefulWidget {
-  const LibraryPage({super.key, required this.kind});
+  const LibraryPage({super.key, required this.kind, this.view, this.onViewChanged});
 
   final LibraryKind kind;
+
+  /// Server library picked from the navigation rail, null means "all media".
+  final catalog.LibraryView? view;
+
+  /// Keeps the rail highlight in sync when the in-page chips change library.
+  final ValueChanged<catalog.LibraryView?>? onViewChanged;
 
   @override
   State<LibraryPage> createState() => _LibraryPageState();
@@ -99,9 +105,27 @@ class _LibraryPageState extends State<LibraryPage> {
   @override
   void initState() {
     super.initState();
+    if (widget.view != null) {
+      _views = [widget.view!];
+      _viewId = widget.view!.id;
+    }
     _reload();
     _loadGenres();
     _loadViews();
+  }
+
+  @override
+  void didUpdateWidget(covariant LibraryPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Compare against the live selection, not the previous widget: changing the
+    // view through the in-page chips already reloaded, so a shell rebuild must
+    // not trigger a second identical query.
+    if (widget.view?.id != _viewId) {
+      _viewId = widget.view?.id;
+      _genre = null;
+      _loadGenres();
+      _reload();
+    }
   }
 
   void _loadGenres() {
@@ -117,7 +141,10 @@ class _LibraryPageState extends State<LibraryPage> {
     try {
       final views = await AppServicesScope.read(context).catalog.views();
       if (!mounted) return;
-      setState(() => _views = [for (final v in views) if (v.name.isNotEmpty) v]);
+      final list = [for (final v in views) if (v.name.isNotEmpty) v];
+      final chosen = widget.view;
+      if (chosen != null && !list.any((v) => v.id == chosen.id)) list.insert(0, chosen);
+      setState(() => _views = list);
     } catch (e) {
       debugPrint('[library] views: $e');
     }
@@ -127,6 +154,7 @@ class _LibraryPageState extends State<LibraryPage> {
     if (id == _viewId) return;
     _viewId = id;
     _genre = null;
+    widget.onViewChanged?.call(_view);
     _loadGenres();
     _reload();
   }
@@ -355,118 +383,136 @@ class _LibraryPageState extends State<LibraryPage> {
       LibraryView.cards => (services.settings.posterSize.columns / 2).ceil(),
       LibraryView.list => 1,
     };
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Padding(
-        padding: const EdgeInsets.only(left: contentLeft, top: 70, right: 120, bottom: 26),
-        child: Row(children: [
-          Text(title, style: Zt.headline),
-          const SizedBox(width: 18),
-          if (_total >= 0) Text('$_total', style: Zt.title.copyWith(color: Zc.textFaint)),
-          const Spacer(),
-          FocusZone(
-            debugLabel: 'library-toolbar',
-            child: Row(children: [
-              TvButton(
-                label: _sort.label(l10n),
-                icon: Icons.sort_rounded,
-                onSelect: () => _pick(l10n.sortBy, {for (final s in _Sort.values) s: s.label(l10n)}, _sort, (v) => _sort = v),
-              ),
-              const SizedBox(width: 14),
-              TvButton(
-                label: _genre ?? l10n.allGenres,
-                icon: Icons.category_outlined,
-                onSelect: () => _pick<String>(l10n.genre, {'': l10n.allGenres, for (final g in _genres) g: g}, _genre ?? '',
-                    (v) => _genre = v.isEmpty ? null : v),
-              ),
-              if (widget.kind != LibraryKind.favorites) ...[
-              const SizedBox(width: 14),
-              TvButton(
-                label: switch (_watched) {
-                  _Watched.all => l10n.filterAll,
-                  _Watched.unwatched => l10n.unwatched,
-                  _Watched.watched => l10n.watched,
-                  _Watched.favorites => l10n.favorites,
-                },
-                icon: Icons.filter_list_rounded,
-                onSelect: () => _pick(l10n.filterShow, {
-                  _Watched.all: l10n.filterEverything,
-                  _Watched.unwatched: l10n.unwatched,
-                  _Watched.watched: l10n.watched,
-                  _Watched.favorites: l10n.favorites,
-                }, _watched, (v) => _watched = v),
-              ),
-              ],
-              if (widget.kind == LibraryKind.movies) ...[
-                const SizedBox(width: 14),
-                TvButton(
-                  label: l10n.groupCollections,
-                  icon: services.settings.groupCollections ? Icons.collections_bookmark_rounded : Icons.collections_bookmark_outlined,
-                  collapsed: true,
-                  primary: services.settings.groupCollections,
-                  onSelect: () => _toggleGrouping(services),
+    // The toolbar, the server-library chips and the poster grid share ONE
+    // scroll view. The old layout pinned the header above an Expanded GridView
+    // with Clip.none, so posters painted over the header while scrolling and
+    // the whole header strip stopped receiving pointer hits.
+    return LayoutBuilder(builder: (context, box) {
+      final cardW = view == LibraryView.list
+          ? box.maxWidth - contentLeft - 120
+          : posterGridCardWidth(box.maxWidth, columns);
+      return FocusZone(
+        debugLabel: 'library-scroll',
+        child: CustomScrollView(
+          controller: _grid,
+          clipBehavior: Clip.hardEdge,
+          scrollCacheExtent: const ScrollCacheExtent.pixels(900),
+          slivers: [
+            SliverToBoxAdapter(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Padding(
+                  padding: const EdgeInsets.only(left: contentLeft, top: 70, right: 120, bottom: 26),
+                  child: Row(children: [
+                    Text(title, style: Zt.headline),
+                    const SizedBox(width: 18),
+                    if (_total >= 0) Text('$_total', style: Zt.title.copyWith(color: Zc.textFaint)),
+                    const Spacer(),
+                    FocusZone(
+                      debugLabel: 'library-toolbar',
+                      child: Row(children: [
+                        TvButton(
+                          label: _sort.label(l10n),
+                          icon: Icons.sort_rounded,
+                          onSelect: () => _pick(l10n.sortBy, {for (final s in _Sort.values) s: s.label(l10n)}, _sort, (v) => _sort = v),
+                        ),
+                        const SizedBox(width: 14),
+                        TvButton(
+                          label: _genre ?? l10n.allGenres,
+                          icon: Icons.category_outlined,
+                          onSelect: () => _pick<String>(l10n.genre, {'': l10n.allGenres, for (final g in _genres) g: g}, _genre ?? '',
+                              (v) => _genre = v.isEmpty ? null : v),
+                        ),
+                        if (widget.kind != LibraryKind.favorites) ...[
+                          const SizedBox(width: 14),
+                          TvButton(
+                            label: switch (_watched) {
+                              _Watched.all => l10n.filterAll,
+                              _Watched.unwatched => l10n.unwatched,
+                              _Watched.watched => l10n.watched,
+                              _Watched.favorites => l10n.favorites,
+                            },
+                            icon: Icons.filter_list_rounded,
+                            onSelect: () => _pick(l10n.filterShow, {
+                              _Watched.all: l10n.filterEverything,
+                              _Watched.unwatched: l10n.unwatched,
+                              _Watched.watched: l10n.watched,
+                              _Watched.favorites: l10n.favorites,
+                            }, _watched, (v) => _watched = v),
+                          ),
+                        ],
+                        if (widget.kind == LibraryKind.movies) ...[
+                          const SizedBox(width: 14),
+                          TvButton(
+                            label: l10n.groupCollections,
+                            icon: services.settings.groupCollections ? Icons.collections_bookmark_rounded : Icons.collections_bookmark_outlined,
+                            collapsed: true,
+                            primary: services.settings.groupCollections,
+                            onSelect: () => _toggleGrouping(services),
+                          ),
+                        ],
+                        const SizedBox(width: 14),
+                        TvButton(
+                          label: _viewLabel(l10n, view),
+                          icon: _viewIcon(view),
+                          collapsed: true,
+                          onSelect: () => _pickView(services),
+                        ),
+                      ]),
+                    ),
+                  ]),
                 ),
-              ],
-              const SizedBox(width: 14),
-              TvButton(
-                label: _viewLabel(l10n, view),
-                icon: _viewIcon(view),
-                collapsed: true,
-                onSelect: () => _pickView(services),
-              ),
-            ]),
-          ),
-        ]),
-      ),
-      if (_views.isNotEmpty)
-        Padding(
-          padding: const EdgeInsets.only(left: contentLeft, right: 120, bottom: 18),
-          child: FocusZone(
-            debugLabel: 'library-views',
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(children: [
-                TvButton(label: l10n.filterAll, primary: _viewId == null, onSelect: () => _selectView(null)),
-                for (final v in _views) ...[
-                  const SizedBox(width: 12),
-                  TvButton(label: v.name, primary: _viewId == v.id, onSelect: () => _selectView(v.id)),
-                ],
+                if (_views.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(left: contentLeft, right: 120, bottom: 18),
+                    child: FocusZone(
+                      debugLabel: 'library-views',
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(children: [
+                          TvButton(label: l10n.filterAll, primary: _viewId == null, onSelect: () => _selectView(null)),
+                          for (final v in _views) ...[
+                            const SizedBox(width: 12),
+                            TvButton(label: v.name, primary: _viewId == v.id, onSelect: () => _selectView(v.id)),
+                          ],
+                        ]),
+                      ),
+                    ),
+                  ),
               ]),
             ),
-          ),
-        ),
-      Expanded(
-        child: _total == 0
-            ? Padding(
-                padding: const EdgeInsets.only(left: contentLeft, top: 40),
-                child: Text(l10n.nothingWithFilters, style: Zt.body),
+            if (_total == 0)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: contentLeft, top: 40),
+                  child: Text(l10n.nothingWithFilters, style: Zt.body),
+                ),
               )
-            : LayoutBuilder(builder: (context, box) {
-                final cardW = view == LibraryView.list ? box.maxWidth - contentLeft - 120 : posterGridCardWidth(box.maxWidth, columns);
-                return FocusZone(
-                  debugLabel: 'library-grid',
-                  child: GridView.builder(
-                    key: ValueKey('$_generation:${view.name}'),
-                    controller: _grid,
-                    clipBehavior: Clip.none,
-                    scrollCacheExtent: const ScrollCacheExtent.pixels(900),
-                    padding: const EdgeInsets.fromLTRB(contentLeft, 16, 120, 140),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: columns,
-                      mainAxisSpacing: 26,
-                      crossAxisSpacing: Zs.cardGap,
-                      childAspectRatio: switch (view) {
-                        LibraryView.posters => cardW / (cardW * 1.5 + 70),
-                        LibraryView.cards => cardW / (cardW * 9 / 16 + 76),
-                        LibraryView.list => cardW / _ListRow.height,
-                      },
-                    ),
-                    itemCount: _total < 0 ? 14 : _items.length,
-                    itemBuilder: (context, i) => _tile(context, view, i, cardW),
+            else
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(contentLeft, 16, 120, 140),
+                sliver: SliverGrid(
+                  key: ValueKey('$_generation:${view.name}'),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: columns,
+                    mainAxisSpacing: 26,
+                    crossAxisSpacing: Zs.cardGap,
+                    childAspectRatio: switch (view) {
+                      LibraryView.posters => cardW / (cardW * 1.5 + 70),
+                      LibraryView.cards => cardW / (cardW * 9 / 16 + 76),
+                      LibraryView.list => cardW / _ListRow.height,
+                    },
                   ),
-                );
-              }),
-      ),
-    ]);
+                  delegate: SliverChildBuilderDelegate(
+                    (context, i) => _tile(context, view, i, cardW),
+                    childCount: _total < 0 ? 14 : _items.length,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
+    });
   }
 }
 

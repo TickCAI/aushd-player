@@ -233,32 +233,36 @@ class _SettingsPageState extends State<SettingsPage> {
                 value: p.hdrPassthrough, onChanged: (v) => _savePlayer(p.copyWith(hdrPassthrough: v))),
             SettingToggleRow(
               title: l10n.autoHdr,
+              // A virtual / non-HDR display explains itself in the subtitle;
+              // it must not silently lock the whole section out of reach.
               subtitle: switch (_display) {
                 null => l10n.autoHdrChecking,
                 DisplayHdrStatus(supported: false) => l10n.autoHdrUnsupported,
                 DisplayHdrStatus(enabled: true) => l10n.autoHdrAlreadyOn,
                 _ => l10n.autoHdrSupported,
               },
-              value: p.autoHdr && (_display?.supported ?? false),
-              enabled: (_display?.supported ?? false) && p.hdrPassthrough,
+              value: p.autoHdr,
+              enabled: p.hdrPassthrough,
               onChanged: (v) => _savePlayer(p.copyWith(autoHdr: v)),
             ),
             SettingToggleRow(
               title: l10n.keepHdr,
               subtitle: l10n.keepHdrHint,
               value: p.keepHdr,
-              enabled: p.autoHdr && (_display?.supported ?? false),
-              onChanged: (v) => _savePlayer(p.copyWith(keepHdr: v)),
+              onChanged: (v) => _savePlayer(p.copyWith(
+                  keepHdr: v, autoHdr: v ? true : p.autoHdr)),
             ),
           ],
           SettingToggleRow(title: l10n.matchRefreshRate, subtitle: l10n.matchRefreshRateHint,
-              value: p.matchRefreshRate, onChanged: (v) => _savePlayer(p.copyWith(matchRefreshRate: v))),
+              value: p.matchRefreshRate,
+              onChanged: (v) => _savePlayer(p.copyWith(
+                  matchRefreshRate: v, keepRefreshRate: v ? p.keepRefreshRate : false))),
           SettingToggleRow(
             title: l10n.keepRefreshRate,
             subtitle: l10n.keepRefreshRateHint,
             value: p.keepRefreshRate,
-            enabled: p.matchRefreshRate,
-            onChanged: (v) => _savePlayer(p.copyWith(keepRefreshRate: v)),
+            onChanged: (v) => _savePlayer(p.copyWith(
+                keepRefreshRate: v, matchRefreshRate: v ? true : p.matchRefreshRate)),
           ),
           SettingHeader(l10n.settingsGroupScreen),
           SettingChoiceRow<String>(
