@@ -37,6 +37,18 @@ void main() {
     expect(vulkan['hwdec'], 'auto-safe');
   });
 
+  test('D3D11 pins a flip-model swapchain and an explicit gpu-context', () {
+    // Phase A keeps the D3D11 backend usable as a fallback tier. The blt
+    // swapchain (d3d11-flip=no) avoids the rebuild that faults the AMD UMD on
+    // a fullscreen transition, and gpu-context stops mpv probing ANGLE.
+    final d3d11 = buildMpvOptions(settings: const PlayerSettings(gpuApi: 'd3d11', videoOutput: 'gpu-next'));
+    expect(d3d11['gpu-api'], 'd3d11');
+    expect(d3d11['gpu-context'], 'd3d11');
+    expect(d3d11['vo'], 'gpu-next');
+    expect(d3d11['d3d11-flip'], 'no');
+    expect(d3d11.containsKey('gpu-context'), isTrue);
+  });
+
   test('a null backup clears a stale fallback mapping', () {
     final primary = Uri.parse('https://image.tmdb.org/t/p/w780/a.jpg');
     final backup = Uri.parse('http://localhost:8096/Items/1/Images/Primary');

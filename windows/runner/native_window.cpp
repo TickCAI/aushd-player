@@ -109,6 +109,16 @@ NativeWindow::~NativeWindow() {
 
 void NativeWindow::SetFullScreen(bool fullscreen) {
   if (fullscreen == fullscreen_) return;
+  // Phase A: do NOT send SWP_FRAMECHANGED. That flag forces Windows to
+  // recompute the whole non-client area (WM_NCCALCSIZE / WM_STYLECHANGED /
+  // WM_NCPAINT) and propagates the churn to child windows — including the
+  // mpv VO (WS_CHILD). On AMD 32.0.32015.7029 the framechanged path during a
+  // fullscreen toggle dove the D3D11 user-mode driver into an execute
+  // violation (amdxx64+0x124815). A standalone mpv in its own top-level
+  // window survived 40 toggles, so the swapchain resize alone is fine; the
+  // extra framechanged churn is what crossed the driver. We still change
+  // GWL_STYLE so the client area fills the monitor, but without framechanged
+  // the non-client recompute is deferred and much gentler on child windows.
   if (fullscreen) {
     MONITORINFO mi = {sizeof(mi)};
     if (!GetMonitorInfo(MonitorFromWindow(window_, MONITOR_DEFAULTTONEAREST), &mi)) return;
@@ -118,12 +128,10 @@ void NativeWindow::SetFullScreen(bool fullscreen) {
     SetWindowLongPtr(window_, GWL_STYLE, saved_style_ & ~(WS_OVERLAPPEDWINDOW | WS_MAXIMIZE));
     const RECT& rc = mi.rcMonitor;
     SetWindowPos(window_, HWND_TOP, rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top,
-                 SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+                 SWP_NOOWNERZORDER);
   } else {
     SetWindowLongPtr(window_, GWL_STYLE, (saved_style_ | WS_OVERLAPPEDWINDOW) & ~WS_MAXIMIZE);
     SetWindowPlacement(window_, &saved_placement_);
-    SetWindowPos(window_, nullptr, 0, 0, 0, 0,
-                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
   }
   fullscreen_ = fullscreen;
 }
