@@ -141,13 +141,28 @@ jobs:
       - name: Fetch libmpv (Windows)
         if: matrix.platform == 'windows'
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           mkdir -p windows/libs
-          url=$(curl -sf https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases/latest | \
-            python -c "import json,sys,re; print(next(a['browser_download_url'] for a in json.load(sys.stdin)['assets'] if re.match(r'mpv-dev-x86_64-\d', a['name'])))")
+          # Anonymous GitHub API calls get rate limited on shared runners and
+          # curl -f then feeds an empty body to python. Authenticate and retry
+          # so a transient 403 cannot kill the whole Windows package.
+          for attempt in 1 2 3; do
+            if curl -sf --retry 3 --retry-delay 2 \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases/latest \
+              > release.json && [ -s release.json ]; then
+              break
+            fi
+            echo "release lookup failed (attempt $attempt)"
+            sleep 3
+          done
+          url=$(python -c "import json,re; d=json.load(open('release.json')); print(next(a['browser_download_url'] for a in d['assets'] if re.match(r'mpv-dev-x86_64-\d', a['name'])))")
           echo "libmpv source: $url"
-          curl -sfL -o mpv-dev.7z "$url"
+          curl -sfL --retry 3 --retry-delay 2 -o mpv-dev.7z "$url"
           7z e -y -ompv-dev mpv-dev.7z '*.dll'
           mv mpv-dev/libmpv-2.dll windows/libs/libmpv-2.dll
           ls -lh windows/libs
