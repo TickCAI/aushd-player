@@ -119,6 +119,7 @@ class _ZerkAppState extends State<ZerkApp> {
       onExitRequested: () async {
         debugPrint('[app] exit requested');
         await KeptDisplay.restore();
+        await RenderGuard.finishClean();
         await AppLog.flush();
         return AppExitResponse.exit;
       },

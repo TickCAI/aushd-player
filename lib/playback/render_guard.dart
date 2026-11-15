@@ -117,12 +117,20 @@ abstract final class RenderGuard {
     _clearTimer?.cancel();
     _clearTimer = Timer(_teardownGrace, () async {
       _clearTimer = null;
-      try {
-        await _write(await SharedPreferences.getInstance(), playing: false);
-      } catch (e) {
-        debugPrint('[render-guard] could not clear playback marker: $e');
-      }
+      await finishClean();
     });
+  }
+
+  /// Clean application exit. A native crash never reaches this callback, so a
+  /// surviving marker always means the previous run died unexpectedly.
+  static Future<void> finishClean() async {
+    _clearTimer?.cancel();
+    _clearTimer = null;
+    try {
+      await _write(await SharedPreferences.getInstance(), playing: false);
+    } catch (e) {
+      debugPrint('[render-guard] could not clear playback marker: $e');
+    }
   }
 
   static Future<void> _write(SharedPreferences prefs, {required bool playing}) async {
