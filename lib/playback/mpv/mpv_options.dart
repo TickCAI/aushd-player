@@ -21,6 +21,15 @@ Map<String, String> buildMpvOptions({
   // to work around an AMD D3D11 crash, silently pair it with the legacy gpu VO
   // rather than letting mpv_initialize fail before the player page appears.
   final effectiveVo = (!linux && api == 'opengl' && vo == 'gpu-next') ? 'gpu' : vo;
+  // Without an explicit context mpv probes one that can fall back to ANGLE's
+  // D3D11 backend even when OpenGL was selected, so "OpenGL" would not leave
+  // the AMD D3D11 driver path that faults on swapchain teardown. winvk uses
+  // the Vulkan WSI; win is native WGL.
+  final gpuContext = switch (api) {
+    'd3d11' => 'd3d11',
+    'vulkan' => 'winvk',
+    _ => 'win',
+  };
   final d3dDecode = settings.hwdec.startsWith('d3d11') ||
       settings.hwdec.startsWith('dxva2') ||
       settings.hwdec.startsWith('nvdec');
@@ -53,13 +62,17 @@ Map<String, String> buildMpvOptions({
     'idle': 'yes',
 
     'vo': effectiveVo,
-    // Windows default used to be hard-coded to d3d11. Some AMD drivers crash
-    // inside amdxx64.dll when a D3D11 swapchain is resized by fullscreen, so
-    // the graphics API is now user-selectable (Vulkan / OpenGL are compiled
-    // into the bundled libmpv). D3D11 hardware decoding is tied to that API,
-    // so fall back to mpv's safe automatic decoder on the other backends.
+    // Windows used to be hard-coded to d3d11. Some AMD drivers crash inside
+    // amdxx64.dll when a D3D11 swapchain is resized by fullscreen or torn
+    // down on exit, so the default is now Vulkan and the API is selectable.
+    // D3D11 hardware decoding is tied to that API, so fall back to mpv's safe
+    // automatic decoder on the other backends.
     if (!linux) 'gpu-api': api,
+    if (!linux) 'gpu-context': gpuContext,
     if (own) ...{
+      // Flip-model swapchains are what the AMD UMD trips over on a fullscreen
+      // transition; blt presentation avoids that rebuild.
+      if (!linux && api == 'd3d11') 'd3d11-flip': 'no',
       'hwdec': d3dDecode && (linux || api != 'd3d11') ? 'auto-safe' : settings.hwdec,
       if (!linux) 'target-colorspace-hint': settings.hdrPassthrough ? 'yes' : 'no',
       'video-sync': !settings.smoothMotion ? 'audio' : (bitstream ? 'display-vdrop' : 'display-resample'),

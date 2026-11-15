@@ -859,7 +859,7 @@ class _AdvancedVideoPageState extends State<_AdvancedVideoPage> {
                   'vulkan': l10n.gpuApiVulkan,
                   'opengl': l10n.gpuApiOpengl,
                 },
-                onChanged: (v) => _save(p.copyWith(gpuApi: v)),
+                onChanged: (v) => _save(p.copyWith(gpuApi: v, gpuApiAuto: false)),
               ),
             ],
             if (Host.isDesktop) ...[

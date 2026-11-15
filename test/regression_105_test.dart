@@ -18,9 +18,11 @@ void main() {
   });
 
   test('a corrupt gpuApi preference can never reach mpv_initialize', () {
-    expect(PlayerSettings.fromJson(const {'gpuApi': 'made-up'}).gpuApi, 'd3d11');
-    expect(PlayerSettings.fromJson(const {'gpuApi': 42}).gpuApi, 'd3d11');
-    expect(const PlayerSettings(gpuApi: 'made-up').safeGpuApi, 'd3d11');
+    // A bad value must fall back to the safe default, which is Vulkan since
+    // the D3D11 path can crash the AMD driver on a swapchain transition.
+    expect(PlayerSettings.fromJson(const {'gpuApi': 'made-up'}).gpuApi, 'vulkan');
+    expect(PlayerSettings.fromJson(const {'gpuApi': 42}).gpuApi, 'vulkan');
+    expect(const PlayerSettings(gpuApi: 'made-up').safeGpuApi, 'vulkan');
     expect(const PlayerSettings(gpuApi: 'vulkan').safeGpuApi, 'vulkan');
   });
 

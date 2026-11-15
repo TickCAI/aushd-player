@@ -7,6 +7,7 @@ import '../../playback/live_session.dart';
 import '../../playback/platform_player.dart';
 import '../../playback/playback_session.dart';
 import '../../playback/player_settings.dart';
+import '../../playback/render_guard.dart';
 import '../../playback/trailer/trailer_player.dart';
 import '../widgets/common.dart';
 import '../widgets/profile_widgets.dart';
@@ -53,6 +54,19 @@ bool _acquireLaunchLock() {
   return false;
 }
 
+/// A GPU context that mpv cannot initialize (no Vulkan ICD, unsupported
+/// option, missing video host) must step the renderer down right away instead
+/// of waiting for a native crash on the next attempt.
+Future<void> _noteLaunchFailure(Object error) async {
+  final message = '$error';
+  if (message.contains('mpv') ||
+      message.contains('video host') ||
+      message.contains('gpu') ||
+      message.contains('vo=')) {
+    await RenderGuard.notePlaybackFailure();
+  }
+}
+
 Future<PlaybackOutcome?> playItem(
   BuildContext context,
   EmbyItem item, {
@@ -63,6 +77,7 @@ Future<PlaybackOutcome?> playItem(
 }) async {
   if (!_acquireLaunchLock()) return null;
   _setPlaying(true);
+  await RenderGuard.markPlaybackStarted();
   final l10n = context.l10n;
   try {
     final services = AppServicesScope.read(context);
@@ -121,10 +136,12 @@ Future<PlaybackOutcome?> playItem(
     // Without this, an mpv initialization failure (bad gpu-api, missing
     // native window, etc.) looked exactly like "clicking play does nothing".
     debugPrint('[playback] launch failed: $e\n$stack');
+    await _noteLaunchFailure(e);
     if (context.mounted) showToast(context, l10n.playbackFailedWith('$e'));
     return null;
   } finally {
     _setPlaying(false);
+    RenderGuard.markPlaybackFinished();
   }
 }
 
@@ -140,6 +157,7 @@ Future<void> playShared(BuildContext context, LiveShare share, {ZapList? zap, in
   if (!_acquireLaunchLock()) return;
   _setPlaying(true);
   _live = true;
+  await RenderGuard.markPlaybackStarted();
   final l10n = context.l10n;
   try {
     final services = AppServicesScope.read(context);
@@ -170,10 +188,11 @@ Future<void> playShared(BuildContext context, LiveShare share, {ZapList? zap, in
     await session.run(share.first);
   } catch (e, stack) {
     debugPrint('[playback] shared launch failed: $e\n$stack');
+    await _noteLaunchFailure(e);
     if (context.mounted) showToast(context, l10n.playbackFailedWith('$e'));
   } finally {
     _live = false;
     _setPlaying(false);
+    RenderGuard.markPlaybackFinished();
   }
 }
-

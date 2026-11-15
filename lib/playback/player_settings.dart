@@ -56,7 +56,8 @@ final class PlayerSettings {
     this.toneMapping = 'auto',
     this.deband = false,
     this.videoOutput = 'gpu-next',
-    this.gpuApi = 'd3d11',
+    this.gpuApi = 'vulkan',
+    this.gpuApiAuto = true,
     this.detailedLog = true,
     this.scopeScreen = 0,
     this.autoCrop = false,
@@ -114,16 +115,22 @@ final class PlayerSettings {
 
   final String videoOutput;
 
-  /// Windows graphics API used by mpv. `d3d11` is the old default; some AMD
-  /// drivers crash in that path during a fullscreen swapchain resize, so the
-  /// user can switch to Vulkan or OpenGL without replacing the mpv binary.
+  /// Windows graphics API used by mpv. Vulkan is the default: the AMD D3D11
+  /// user-mode driver (`amdxx64.dll`) can fault when a swapchain is resized
+  /// by a fullscreen switch or destroyed on exit. D3D11 stays available for
+  /// users who explicitly need it.
   final String gpuApi;
+
+  /// True while the backend is still the app's choice rather than the user's.
+  /// A manual pick (or an automatic step-down after a crash) must never be
+  /// overwritten by a future default migration.
+  final bool gpuApiAuto;
 
   static const gpuApis = {'d3d11', 'vulkan', 'opengl'};
 
   /// A corrupted/old preference must never be handed to mpv verbatim: an
   /// unknown `gpu-api` fails mpv_initialize before the player page appears.
-  String get safeGpuApi => gpuApis.contains(gpuApi) ? gpuApi : 'd3d11';
+  String get safeGpuApi => gpuApis.contains(gpuApi) ? gpuApi : 'vulkan';
 
   final bool detailedLog;
 
@@ -182,6 +189,7 @@ final class PlayerSettings {
     bool? deband,
     String? videoOutput,
     String? gpuApi,
+    bool? gpuApiAuto,
     bool? detailedLog,
     double? scopeScreen,
     bool? autoCrop,
@@ -224,6 +232,7 @@ final class PlayerSettings {
       deband: deband ?? this.deband,
       videoOutput: videoOutput ?? this.videoOutput,
       gpuApi: gpuApi ?? this.gpuApi,
+      gpuApiAuto: gpuApiAuto ?? this.gpuApiAuto,
       detailedLog: detailedLog ?? this.detailedLog,
       scopeScreen: scopeScreen ?? this.scopeScreen,
       autoCrop: autoCrop ?? this.autoCrop,
@@ -268,6 +277,7 @@ final class PlayerSettings {
         'deband': deband,
         'vo': videoOutput,
         'gpuApi': gpuApi,
+        'gpuApiAuto': gpuApiAuto,
         'detailedLog': detailedLog,
         'scope': scopeScreen,
         'autoCrop': autoCrop,
@@ -324,6 +334,7 @@ final class PlayerSettings {
       deband: pick('deband', d.deband),
       videoOutput: pick('vo', d.videoOutput),
       gpuApi: gpuApis.contains(pick<String>('gpuApi', d.gpuApi)) ? pick<String>('gpuApi', d.gpuApi) : d.gpuApi,
+      gpuApiAuto: pick('gpuApiAuto', d.gpuApiAuto),
       detailedLog: pick('detailedLog', d.detailedLog),
       scopeScreen: pick('scope', d.scopeScreen),
       autoCrop: pick('autoCrop', d.autoCrop),

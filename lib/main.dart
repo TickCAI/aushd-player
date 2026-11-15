@@ -15,6 +15,7 @@ import 'playback/media3/media3_smoke.dart';
 import 'playback/mpv/mpv_backend.dart';
 import 'playback/player_settings.dart';
 import 'playback/player_smoke.dart';
+import 'playback/render_guard.dart';
 import 'core/windows/native_window.dart';
 import 'l10n/l10n.dart';
 import 'ui/core/gamepad.dart';
@@ -36,6 +37,9 @@ Future<void> main(List<String> args) async {
   // Undo display changes a crashed run left behind (Windows HDR persists
   // across reboots and makes the whole desktop look washed out).
   if (Host.isWindows) await DisplayGuard.recoverOnStartup();
+  // Step the renderer down if the previous run died inside playback (the AMD
+  // D3D11 driver crash leaves no Dart exception, only a surviving marker).
+  if (Host.isWindows) await RenderGuard.recoverOnStartup();
   WidgetsBinding.instance.addPostFrameCallback((_) => AppLog.mark('first frame'));
   if (Host.isWindows) await _initWindow();
   final services = await AppServices.create();
