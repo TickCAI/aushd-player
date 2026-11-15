@@ -10,6 +10,7 @@ import '../../data/seerr_api.dart';
 import '../../data/taste_profile.dart';
 import '../../data/title_tags.dart';
 import '../../core/log/app_log.dart';
+import '../../l10n/content_zh.dart';
 import '../../l10n/l10n.dart';
 import '../core/artwork.dart';
 import '../core/input_mode.dart';
@@ -272,6 +273,15 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  /// BoxSets are named -- and illustrated -- in whatever language the server
+  /// stored. A shelf full of Korean/English covers reads as broken on a
+  /// Chinese-first home page, so keep only Chinese-named sets here. The
+  /// Collections page still shows everything.
+  static MixedItems _chineseCollections(List<EmbyItem> items) => <Object>[
+        for (final item in items)
+          if (ContentZh.hasChinese(item.name)) item,
+      ];
+
   List<_Row> _buildRows(AppServices s) {
     final c = s.catalog;
     final seerr = s.seerr;
@@ -296,7 +306,9 @@ class _HomePageState extends State<HomePage> {
       _Row((l) => l.recommendedForYou, () => _forYou(s), style: CardStyle.spotlight),
       _starring(s, 0),
       _likeTag(s, 0),
-      _Row((l) => l.collections, () => c.allCollections(recent: true, limit: 20), kind: _Kind.collections, recommends: false),
+      _Row((l) => l.collections,
+          () async => _chineseCollections(await c.allCollections(recent: true, limit: 60)),
+          kind: _Kind.collections, recommends: false),
       _because(s, (t) => t.recentSeries, 0, style: CardStyle.landscape),
       _Row((l) => l.topRatedMovies, () => items(c.query(types: ['Movie'], sortBy: 'CommunityRating', descending: true, minCommunityRating: 7, limit: 24))),
       _directedBy(s, 0),
@@ -658,6 +670,7 @@ class _HomePageState extends State<HomePage> {
         final (cardW, areaH) = switch (row.kind) {
           _Kind.collections => (560.0, 560 * 0.42 + 44),
           _Kind.continueWatching => (Zs.landscapeWidth, cardAreaHeight(CardStyle.landscape)),
+          _Kind.libraries => (libraryCardWidth, libraryCardWidth * 9 / 16 + 44),
           _ => (cardWidth(row.style), cardAreaHeight(row.style)),
         };
         if (snap.data == null && !snap.hasError) {
@@ -677,6 +690,7 @@ class _HomePageState extends State<HomePage> {
             height: areaH,
             gap: switch ((row.kind, row.style)) {
               (_Kind.collections, _) => 28,
+              (_Kind.libraries, _) => 24,
               (_, CardStyle.ranked) => 8,
               (_, CardStyle.spotlight) => 30,
               _ => Zs.cardGap,

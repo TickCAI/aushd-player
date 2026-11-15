@@ -8,13 +8,15 @@ import '../../l10n/l10n.dart';
 import '../focus/tv_focusable.dart';
 import '../theme/tokens.dart';
 import 'common.dart';
-import 'mixed_cards.dart' show spotlightWidth;
 import 'net_image.dart';
 
-/// Library tiles use the same 640x360 spotlight size as "Recommended for you".
-/// A 380-wide landscape card made a server library look like a shrunken poster
-/// and cut off the library name.
-const double libraryCardWidth = spotlightWidth;
+/// Library tiles are a compact 560x315 (16:9) sibling of the 640x360 spotlight.
+/// The full spotlight size made the whole shelf dominate the home page, but a
+/// 380-wide landscape card made a server library look like a shrunken poster
+/// and cut off the library name. Artwork stays uncropped (`BoxFit.contain`)
+/// over a blurred copy of itself, so a tall poster collage never loses its
+/// titles when the tile gets smaller.
+const double libraryCardWidth = 560;
 
 /// A wide tile for a real Emby/Jellyfin library (a `CollectionFolder`).
 ///
@@ -85,7 +87,7 @@ class LibraryCard extends StatelessWidget {
               // Blurred, full-bleed underlay fills the letterbox when the
               // server only has a tall poster collage.
               ImageFiltered(
-                imageFilter: ui.ImageFilter.blur(sigmaX: 32, sigmaY: 32),
+                imageFilter: ui.ImageFilter.blur(sigmaX: 26, sigmaY: 26),
                 child: NetImage(url: cover, width: width, height: height, fit: BoxFit.cover),
               ),
               const DecoratedBox(decoration: BoxDecoration(color: Color(0x59000000))),
@@ -109,14 +111,14 @@ class LibraryCard extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(26, 26, 26, 22),
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   if (logo != null)
                     SizedBox(
-                      height: 76,
+                      height: 64,
                       width: width * 0.55,
                       child: NetImage(
                         url: logo,
@@ -128,13 +130,13 @@ class LibraryCard extends StatelessWidget {
                     )
                   else
                     titleText,
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   MetaLine(
                     [typeLabel(view.collectionType, l10n), if (count != null && count > 0) l10n.filmCount(count)],
                     style: Zt.caption.copyWith(color: Zc.textMuted),
                   ),
                   if (overview != null && overview.isNotEmpty) ...[
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     Text(
                       overview,
                       maxLines: 2,
@@ -147,8 +149,8 @@ class LibraryCard extends StatelessWidget {
             ),
             if (focused)
               Positioned(
-                top: 14,
-                right: 14,
+                top: 12,
+                right: 12,
                 child: Pill(ContentZh.enabled ? '进入' : 'Open', icon: Icons.arrow_forward_rounded, color: Zc.accent),
               ),
           ]),

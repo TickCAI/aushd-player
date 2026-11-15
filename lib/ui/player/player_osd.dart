@@ -835,7 +835,7 @@ class _PlayerOsdState extends State<PlayerOsd> with SingleTickerProviderStateMix
       Positioned(
         left: 96,
         right: 96,
-        top: 64,
+        top: 44,
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           FocusZone(
             debugLabel: 'osd-top',
@@ -859,7 +859,7 @@ class _PlayerOsdState extends State<PlayerOsd> with SingleTickerProviderStateMix
       Positioned(
         left: 96,
         right: 96,
-        bottom: 64,
+        bottom: 36,
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () {},
@@ -880,7 +880,7 @@ class _PlayerOsdState extends State<PlayerOsd> with SingleTickerProviderStateMix
               seeking: _seekTarget != null,
             ),
           ),
-          const SizedBox(height: 34),
+          const SizedBox(height: 14),
           FocusZone(
             debugLabel: 'osd-buttons',
             child: Row(children: [
@@ -982,13 +982,13 @@ class _ProgressBar extends StatelessWidget {
     final frac = duration > Duration.zero ? (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0) : 0.0;
     final ahead = duration > Duration.zero ? (buffered.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0) : 0.0;
     return Row(children: [
-      SizedBox(width: 130, child: Text(_fmt(position), style: Zt.label)),
+      SizedBox(width: 112, child: Text(_fmt(position), style: Zt.label)),
       Expanded(
         child: LayoutBuilder(
           builder: (context, box) {
             double at(Offset local) => box.maxWidth == 0 ? 0 : (local.dx / box.maxWidth).clamp(0.0, 1.0);
             final bar = SizedBox(
-            height: 28,
+            height: 24,
             child: Stack(alignment: Alignment.centerLeft, clipBehavior: Clip.none, children: [
               AnimatedContainer(
                 duration: Zm.fast,
@@ -1017,8 +1017,8 @@ class _ProgressBar extends StatelessWidget {
                     ),
               if (focused)
                 Positioned(
-                  left: (box.maxWidth * frac - 14).clamp(0, box.maxWidth - 28),
-                  child: Container(width: 28, height: 28, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle)),
+                  left: (box.maxWidth * frac - 11).clamp(0, box.maxWidth - 22),
+                  child: Container(width: 22, height: 22, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle)),
                 ),
               if (trickplay != null && duration > Duration.zero && (hover != null || seeking))
                 Positioned(
@@ -1055,13 +1055,13 @@ class _ProgressBar extends StatelessWidget {
                   onScrub!(at(d.localPosition));
                 },
                 onHorizontalDragEnd: (_) => onScrubEnd?.call(),
-                child: Padding(padding: const EdgeInsets.symmetric(vertical: 22), child: bar),
+                child: Padding(padding: const EdgeInsets.symmetric(vertical: 10), child: bar),
               ),
             );
           },
         ),
       ),
-      SizedBox(width: 130, child: Text(_fmt(duration), style: Zt.label, textAlign: TextAlign.right)),
+      SizedBox(width: 112, child: Text(_fmt(duration), style: Zt.label, textAlign: TextAlign.right)),
     ]);
   }
 }

@@ -82,9 +82,20 @@ void main() {
     expect(LibraryCard.typeLabel('music', lookupL10n(const Locale('en'))), 'Music');
   });
 
-  test('library tiles use the wide spotlight size, not the 380 landscape card', () {
-    expect(libraryCardWidth, spotlightWidth);
+  test('library tiles are compact 16:9 tiles, larger than a landscape card', () {
+    expect(libraryCardWidth, lessThan(spotlightWidth));
     expect(libraryCardWidth, greaterThan(380.0));
+    expect(libraryCardWidth * 9 / 16, closeTo(315.0, 0.001));
+  });
+
+  test('home collections keep Chinese names and drop Korean/English ones', () {
+    expect(ContentZh.hasChinese('速度与激情系列'), isTrue);
+    expect(ContentZh.hasChinese('谷雨 合集'), isTrue);
+    expect(ContentZh.hasChinese('검은 사제들 시리즈'), isFalse);
+    expect(ContentZh.hasChinese('프린스 오브 레전드'), isFalse);
+    expect(ContentZh.hasChinese('콘크리트 유토피아'), isFalse);
+    expect(ContentZh.hasChinese('The Avengers Collection'), isFalse);
+    expect(ContentZh.hasChinese('アベンジャーズ'), isFalse);
   });
 
   test('a Limit-capped TotalRecordCount can never shrink a real library count', () {

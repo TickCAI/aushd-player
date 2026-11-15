@@ -83,8 +83,8 @@ final class AppSettings {
     this.playlistGuideUrl = '',
     this.startFullScreen = false,
     this.posterSize = PosterSize.medium,
-    this.collectionsView = CollectionsView.covers,
-    this.libraryView = LibraryView.posters,
+    this.collectionsView = CollectionsView.wide,
+    this.libraryView = LibraryView.cards,
     this.homeCollections = const {},
     this.cardTrailers = true,
   });
@@ -256,8 +256,14 @@ final class AppSettings {
         playlistGuideUrl: j['playlistGuideUrl'] as String? ?? '',
         startFullScreen: j['startFullScreen'] as bool? ?? false,
         posterSize: PosterSize.values.asNameMap()[j['posterSize']] ?? PosterSize.medium,
-        collectionsView: CollectionsView.values.asNameMap()[j['collectionsView']] ?? CollectionsView.covers,
-        libraryView: LibraryView.values.asNameMap()[j['libraryView']] ?? LibraryView.posters,
+        // TV-style wide cards are the default now. Upgrade existing installs
+        // once (viewsV), then respect whatever the user picks afterwards.
+        collectionsView: j['viewsV'] == 2
+            ? CollectionsView.values.asNameMap()[j['collectionsView']] ?? CollectionsView.wide
+            : CollectionsView.wide,
+        libraryView: j['viewsV'] == 2
+            ? LibraryView.values.asNameMap()[j['libraryView']] ?? LibraryView.cards
+            : LibraryView.cards,
         homeCollections: {
           for (final MapEntry(:key, :value) in ((j['homeCollections'] as Map?) ?? const {}).entries)
             '$key': [for (final c in value as List) (c[0] as String, c[1] as String)],
@@ -298,6 +304,7 @@ final class AppSettings {
         'posterSize': posterSize.name,
         'collectionsView': collectionsView.name,
         'libraryView': libraryView.name,
+        'viewsV': 2,
         'homeCollections': {
           for (final MapEntry(:key, :value) in homeCollections.entries) key: [for (final (id, name) in value) [id, name]],
         },

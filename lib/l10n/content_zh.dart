@@ -15,6 +15,13 @@ abstract final class ContentZh {
 
   static bool get enabled => uiLanguage.startsWith('zh');
 
+  /// True when [text] contains at least one CJK ideograph. Used to keep
+  /// server-side BoxSets whose stored name/artwork is Korean, Japanese or
+  /// English off the Chinese-first home shelf.
+  static final RegExp _han = RegExp(r'[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]');
+
+  static bool hasChinese(String text) => _han.hasMatch(text);
+
   /// Translate a genre/type label. Unknown labels pass through untouched so a
   /// server-specific category is never lost.
   static String genre(String raw) {

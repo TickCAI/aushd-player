@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
 
+import '../../core/host.dart';
 import '../theme/tokens.dart';
 
 class TvScale extends StatelessWidget {
@@ -28,7 +29,13 @@ class TvScale extends StatelessWidget {
     return LayoutBuilder(builder: (context, box) {
       if (!box.hasBoundedWidth || !box.hasBoundedHeight || box.maxWidth == 0 || box.maxHeight == 0) return child;
       final scale = math.min(box.maxWidth / designWidth, box.maxHeight / designHeight);
-      final size = Size(box.maxWidth / scale, math.min(box.maxHeight / scale, maxHeight));
+      // TV builds stay exactly 16:9. Letting the logical canvas grow to
+      // maxHeight on a tall screen produced a portrait-ish layout that no
+      // remote was designed for. Desktop windows keep the adaptive fill, so a
+      // non-16:9 Windows window is not letterboxed.
+      final size = Host.isAndroid
+          ? const Size(designWidth, designHeight)
+          : Size(box.maxWidth / scale, math.min(box.maxHeight / scale, maxHeight));
       return ValueListenableBuilder<bool>(
         valueListenable: videoUnderlay,
         builder: (context, underlay, child) => ColoredBox(color: underlay ? const Color(0x00000000) : Zc.background, child: child),
